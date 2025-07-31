@@ -82,7 +82,7 @@ export function SignupForm() {
         title: "Account Created",
         description: "Welcome to BlueRide!",
       });
-      router.push('/');
+      router.push('/profile');
     } catch (error: any) {
       toast({
         title: "Sign up Failed",
@@ -110,7 +110,7 @@ export function SignupForm() {
         title: "Signup Successful",
         description: "Your account has been created.",
       })
-      router.push('/');
+      router.push('/profile');
     } catch (error: any) {
        toast({
         title: "Signup Failed",

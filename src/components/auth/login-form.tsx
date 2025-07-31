@@ -81,7 +81,7 @@ export function LoginForm() {
         title: "Login Successful",
         description: "Welcome back!",
       });
-      router.push('/');
+      router.push('/profile');
     } catch (error: any) {
       let description = "An unknown error occurred during Google sign-in.";
       if (error.code) {
@@ -103,7 +103,7 @@ export function LoginForm() {
         title: "Login Successful",
         description: "Welcome back!",
       })
-      router.push('/');
+      router.push('/profile');
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
        if (error.code === 'auth/invalid-credential') {
