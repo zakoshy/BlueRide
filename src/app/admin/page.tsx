@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -55,6 +55,8 @@ export default function AdminPage() {
   const [boats, setBoats] = useState<Boat[]>([]);
   const [isManageBoatsDialogOpen, setManageBoatsDialogOpen] = useState(false);
   const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
+  const [isPromoteUserDialogOpen, setPromoteUserDialogOpen] = useState(false);
+  const [userToPromote, setUserToPromote] = useState('');
   
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
@@ -186,6 +188,17 @@ export default function AdminPage() {
     }
   };
 
+  const handlePromoteUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userToPromote) {
+        toast({ title: "Error", description: "Please select a user to promote.", variant: "destructive" });
+        return;
+    }
+    await handleRoleChange(userToPromote, 'boat_owner');
+    setUserToPromote('');
+    setPromoteUserDialogOpen(false);
+  }
+
   const handleValidateBoat = async (boatId: string) => {
     if (!selectedOwner) return;
     try {
@@ -250,6 +263,9 @@ export default function AdminPage() {
         </div>
     );
   }
+  
+  const riderUsers = users.filter(u => u.role === 'rider');
+
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -296,9 +312,51 @@ export default function AdminPage() {
         <p className="text-muted-foreground mb-8">Manage users, roles, and boats.</p>
         
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
-            <CardDescription>View all users and modify their roles. Boat owners can have their boats managed from here.</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
+              <CardDescription>View all users and modify their roles. Boat owners can have their boats managed from here.</CardDescription>
+            </div>
+             <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
+                <DialogTrigger asChild>
+                     <Button><UserPlus className="mr-2 h-4 w-4"/>Promote User</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Promote User to Boat Owner</DialogTitle>
+                        <DialogDescription>
+                            Select a user with the 'Rider' role to promote them to a 'Boat Owner'.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handlePromoteUser}>
+                        <div className="grid gap-4 py-4">
+                           <Label htmlFor="user-to-promote">Select Rider</Label>
+                           <Select onValueChange={setUserToPromote} value={userToPromote}>
+                             <SelectTrigger id="user-to-promote">
+                               <SelectValue placeholder="Select a user to promote..." />
+                             </SelectTrigger>
+                             <SelectContent>
+                               {riderUsers.length > 0 ? (
+                                   riderUsers.map(u => (
+                                     <SelectItem key={u.uid} value={u.uid}>
+                                         <div className="flex flex-col">
+                                            <span className="font-medium">{u.name}</span>
+                                            <span className="text-xs text-muted-foreground">{u.email}</span>
+                                         </div>
+                                     </SelectItem>
+                                   ))
+                               ) : (
+                                <SelectItem value="none" disabled>No riders available to promote</SelectItem>
+                               )}
+                             </SelectContent>
+                           </Select>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit" disabled={!userToPromote || userToPromote === 'none'}>Promote to Boat Owner</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+             </Dialog>
           </CardHeader>
           <CardContent>
             <Table>
