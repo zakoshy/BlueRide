@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation"
 import { Separator } from "../ui/separator"
 import { Chrome, Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
+import { useAuth } from "@/hooks/use-auth"
 
 
 const formSchema = z.object({
@@ -33,6 +34,7 @@ const formSchema = z.object({
 export function LoginForm() {
   const { toast } = useToast()
   const router = useRouter()
+  const { refetchProfile } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -45,7 +47,12 @@ export function LoginForm() {
   })
 
   const handleSuccessfulLogin = async (user: User) => {
+    // Force a refetch of the profile to get the latest role
+    await refetchProfile();
+
     try {
+        // After refetching, the updated profile will be available.
+        // We fetch it again here to ensure we have the absolute latest data before redirecting.
         const response = await fetch(`/api/users/${user.uid}`);
         if (response.ok) {
           const profile = await response.json();
