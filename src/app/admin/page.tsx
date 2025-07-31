@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, UserCog, Users, AlertCircle, LogOut, User as UserIcon, Ship } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,6 +16,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 
@@ -29,6 +33,14 @@ interface ManagedUser {
   createdAt: string;
 }
 
+interface Boat {
+    _id: string;
+    name: string;
+    capacity: number;
+    description: string;
+    ownerId: string;
+}
+
 export default function AdminPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -37,6 +49,15 @@ export default function AdminPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedOwner, setSelectedOwner] = useState<ManagedUser | null>(null);
+  const [boats, setBoats] = useState<Boat[]>([]);
+  const [isManageBoatsDialogOpen, setManageBoatsDialogOpen] = useState(false);
+  const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
+  
+  const [newBoatName, setNewBoatName] = useState('');
+  const [newBoatCapacity, setNewBoatCapacity] = useState('');
+  const [newBoatDescription, setNewBoatDescription] = useState('');
+
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -80,6 +101,64 @@ export default function AdminPage() {
     }
     return name.substring(0, 2).toUpperCase();
   }
+  
+    const fetchBoatsForOwner = useCallback(async (ownerId: string) => {
+        if (!ownerId) return;
+        try {
+            const response = await fetch(`/api/boats?ownerId=${ownerId}`);
+            if (response.ok) {
+                const data = await response.json();
+                setBoats(data);
+            } else {
+                toast({ title: "Error", description: "Failed to fetch boats for this owner.", variant: "destructive" });
+                setBoats([]);
+            }
+        } catch (error) {
+            console.error("Failed to fetch boats", error);
+            toast({ title: "Error", description: "An unexpected error occurred while fetching boats.", variant: "destructive" });
+            setBoats([]);
+        }
+    }, [toast]);
+
+  const handleManageBoatsClick = (owner: ManagedUser) => {
+      setSelectedOwner(owner);
+      fetchBoatsForOwner(owner.uid);
+      setManageBoatsDialogOpen(true);
+  }
+  
+  const handleAddBoat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOwner) return;
+
+    try {
+        const response = await fetch('/api/boats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: newBoatName,
+                capacity: parseInt(newBoatCapacity, 10),
+                description: newBoatDescription,
+                ownerId: selectedOwner.uid
+            }),
+        });
+
+        if (response.ok) {
+            toast({ title: "Success", description: "New boat added successfully." });
+            setNewBoatName('');
+            setNewBoatCapacity('');
+            setNewBoatDescription('');
+            setAddBoatDialogOpen(false);
+            fetchBoatsForOwner(selectedOwner.uid); // Refresh the list
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Add Failed", description: errorData.message || "Could not add boat.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to add boat", error);
+        toast({ title: "Error", description: "An unexpected error occurred while adding the boat.", variant: "destructive" });
+    }
+  }
+
 
   const handleRoleChange = async (uid: string, newRole: string) => {
     try {
@@ -91,7 +170,6 @@ export default function AdminPage() {
 
       if (response.ok) {
         toast({ title: "Success", description: "User role updated successfully." });
-        // Refetch users to show the updated role
         fetchUsers();
       } else {
         const errorData = await response.json();
@@ -188,12 +266,12 @@ export default function AdminPage() {
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Admin'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage users and system settings.</p>
+        <p className="text-muted-foreground mb-8">Manage users, roles, and boats.</p>
         
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
-            <CardDescription>View all users and modify their roles.</CardDescription>
+            <CardDescription>View all users and modify their roles. Boat owners can have their boats managed from here.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -203,7 +281,7 @@ export default function AdminPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Change Role</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -215,13 +293,13 @@ export default function AdminPage() {
                       <Badge variant={u.role === 'admin' ? 'destructive' : u.role === 'boat_owner' ? 'default' : 'secondary'}>{u.role}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
                        <Select
                           defaultValue={u.role}
                           onValueChange={(newRole) => handleRoleChange(u.uid, newRole)}
-                          disabled={user ? u.uid === user.uid : false} // Admin can't change their own role
+                          disabled={user ? u.uid === user.uid : false}
                         >
-                          <SelectTrigger className="w-[180px]">
+                          <SelectTrigger className="w-[130px] inline-flex">
                             <SelectValue placeholder="Select a role" />
                           </SelectTrigger>
                           <SelectContent>
@@ -230,6 +308,12 @@ export default function AdminPage() {
                             <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>
                         </Select>
+                        {u.role === 'boat_owner' && (
+                            <Button variant="outline" size="sm" onClick={() => handleManageBoatsClick(u)}>
+                                <Ship className="mr-2 h-4 w-4"/>
+                                Manage Boats
+                            </Button>
+                        )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -238,6 +322,77 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </main>
+      
+      {/* Manage Boats Dialog */}
+       <Dialog open={isManageBoatsDialogOpen} onOpenChange={setManageBoatsDialogOpen}>
+            <DialogContent className="sm:max-w-[625px]">
+                <DialogHeader>
+                    <DialogTitle>Manage Boats for {selectedOwner?.name}</DialogTitle>
+                    <DialogDescription>
+                        View, add, or edit boats for this owner.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold">Current Fleet</h3>
+                        <Dialog open={isAddBoatDialogOpen} onOpenChange={setAddBoatDialogOpen}>
+                            <DialogTrigger asChild>
+                                 <Button size="sm"><PlusCircle className="mr-2 h-4 w-4"/>Add New Boat</Button>
+                            </DialogTrigger>
+                             <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                <DialogTitle>Add New Boat</DialogTitle>
+                                <DialogDescription>
+                                    Fill in the details for the new boat.
+                                </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handleAddBoat}>
+                                <div className="grid gap-4 py-4">
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="boat-name" className="text-right">Name</Label>
+                                        <Input id="boat-name" value={newBoatName} onChange={(e) => setNewBoatName(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="capacity" className="text-right">Capacity</Label>
+                                        <Input id="capacity" type="number" value={newBoatCapacity} onChange={(e) => setNewBoatCapacity(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="description" className="text-right">Description</Label>
+                                        <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit">Save Boat</Button>
+                                </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                     {boats.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Capacity</TableHead>
+                                    <TableHead>Description</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {boats.map((boat) => (
+                                <TableRow key={boat._id}>
+                                    <TableCell className="font-medium">{boat.name}</TableCell>
+                                    <TableCell>{boat.capacity}</TableCell>
+                                    <TableCell>{boat.description}</TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                     ) : (
+                        <p className="text-center text-muted-foreground py-4">This owner has no boats yet.</p>
+                     )}
+                </div>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
