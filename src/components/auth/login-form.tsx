@@ -18,7 +18,7 @@ import { CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { auth } from "@/lib/firebase/config"
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { Separator } from "../ui/separator"
 import { Chrome, Eye, EyeOff } from "lucide-react"
@@ -44,6 +44,27 @@ export function LoginForm() {
     },
   })
 
+  const handleSuccessfulLogin = async (user: User) => {
+    try {
+        const response = await fetch(`/api/users/${user.uid}`);
+        if (response.ok) {
+          const profile = await response.json();
+          if (profile.role === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/profile');
+          }
+        } else {
+            // Default redirection if profile fetch fails
+            router.push('/profile');
+        }
+    } catch (error) {
+        console.error("Failed to fetch user profile for redirection", error);
+        router.push('/profile'); // Fallback redirection
+    }
+  }
+
+
   const saveUserToDb = async (user: { uid: string; email: string | null; displayName: string | null; }) => {
     try {
       const response = await fetch('/api/users', {
@@ -62,18 +83,21 @@ export function LoginForm() {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to save user to database');
       }
+       return await response.json();
     } catch (error: any) {
       toast({
         title: "Database Error",
         description: `We had trouble syncing your profile. ${error.message}`,
         variant: "destructive",
       });
+      return null;
     }
   };
 
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
+    setIsSubmitting(true);
     try {
       const result = await signInWithPopup(auth, provider);
       await saveUserToDb(result.user);
@@ -81,7 +105,7 @@ export function LoginForm() {
         title: "Login Successful",
         description: "Welcome back!",
       });
-      router.push('/profile');
+      await handleSuccessfulLogin(result.user);
     } catch (error: any) {
       let description = "An unknown error occurred during Google sign-in.";
       if (error.code) {
@@ -92,18 +116,20 @@ export function LoginForm() {
         description: description,
         variant: "destructive",
       });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password)
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       })
-      router.push('/profile');
+      await handleSuccessfulLogin(userCredential.user);
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
        if (error.code === 'auth/invalid-credential') {
@@ -124,7 +150,7 @@ export function LoginForm() {
   return (
     <Form {...form}>
        <CardContent className="space-y-4 pt-6">
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSubmitting}>
             <Chrome className="mr-2 h-4 w-4" />
             Sign in with Google
           </Button>
