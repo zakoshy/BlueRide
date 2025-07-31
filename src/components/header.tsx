@@ -122,20 +122,26 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/profile/details')}>
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile/details">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
                   </DropdownMenuItem>
                   {isBoatOwner && (
-                     <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                     <DropdownMenuItem asChild>
+                      <Link href="/dashboard">
                         <Ship className="mr-2 h-4 w-4" />
                         <span>Owner Dashboard</span>
+                      </Link>
                     </DropdownMenuItem>
                   )}
                   {isAdmin && (
-                     <DropdownMenuItem onClick={() => router.push('/admin')}>
+                     <DropdownMenuItem asChild>
+                      <Link href="/admin">
                         <Shield className="mr-2 h-4 w-4" />
                         <span>Admin Dashboard</span>
+                      </Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
