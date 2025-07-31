@@ -95,9 +95,15 @@ export function SignupForm() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
-      if (auth.currentUser) {
-        await updateProfile(auth.currentUser, { displayName: values.name })
-        await saveUserToDb(auth.currentUser);
+      // The user is available in userCredential.user, not auth.currentUser immediately
+      const user = userCredential.user;
+      if (user) {
+        await updateProfile(user, { displayName: values.name })
+        await saveUserToDb({
+            uid: user.uid,
+            email: user.email,
+            displayName: values.name
+        });
       }
       
       toast({
@@ -175,7 +181,7 @@ export function SignupForm() {
                       className="absolute top-0 right-0 h-full px-3"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? <EyeOff /> : <Eye />}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
                     </Button>
                   </div>

@@ -42,10 +42,42 @@ export function LoginForm() {
     },
   })
 
+  const saveUserToDb = async (user: { uid: string; email: string | null; displayName: string | null; }) => {
+    // This function can be called for both new and existing users on Google sign-in.
+    // The backend API handles the logic of creating or updating the user record.
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save user to database');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Database Error",
+        description: `We had trouble syncing your profile. ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      // Save/update user info in MongoDB on every Google sign-in
+      await saveUserToDb(result.user);
       toast({
         title: "Login Successful",
         description: "Welcome back!",
@@ -125,7 +157,7 @@ export function LoginForm() {
                       className="absolute top-0 right-0 h-full px-3"
                       onClick={() => setShowPassword(!showPassword)}
                     >
-                      {showPassword ? <EyeOff /> : <Eye />}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
                   </Button>
                 </div>
