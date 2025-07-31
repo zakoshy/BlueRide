@@ -41,21 +41,27 @@ export function ForgotPasswordForm() {
       await sendPasswordResetEmail(auth, values.email);
       toast({
         title: "Check Your Email",
-        description: "A password reset link has been sent to your email address.",
+        description: "If an account exists for this email, a password reset link has been sent.",
       })
       form.reset();
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
+       // Firebase returns auth/user-not-found if the email doesn't exist.
+       // For security, we don't want to confirm if an email is registered or not.
+       // So, we show a generic success message even in this case.
        if (error.code === 'auth/user-not-found') {
-            description = "No user found with this email address. Please check your email and try again.";
+            toast({
+                title: "Check Your Email",
+                description: "If an account exists for this email, a password reset link has been sent.",
+            });
        } else if (error.code) {
             description = error.message;
+            toast({
+                title: "Error",
+                description: description,
+                variant: "destructive",
+            });
        }
-       toast({
-        title: "Error",
-        description: description,
-        variant: "destructive",
-      })
     } finally {
         setIsSubmitting(false);
     }
