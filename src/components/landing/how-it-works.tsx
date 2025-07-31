@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 
 const steps = [
@@ -47,7 +48,7 @@ export function HowItWorks() {
           className="mx-auto aspect-square overflow-hidden rounded-xl object-cover object-center shadow-lg sm:w-full"
           data-ai-hint="app screen mobile"
           height="550"
-          src="https://placehold.co/550x550.png"
+          src="https://images.unsplash.com/photo-1652235858716-5f3ae94a3a38?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mjg4fHxvY2VhbiUyMGJvYXRzfGVufDB8fDB8fHww"
           width="550"
         />
       </div>
