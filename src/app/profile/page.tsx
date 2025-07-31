@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Ship, Shield } from "lucide-react";
+import { ArrowLeft, Ship, Shield, User } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -79,7 +79,7 @@ export default function ProfilePage() {
     if (profile?.role === 'boat_owner') {
       return <Ship className="h-4 w-4" />;
     }
-    return <Ship className="h-4 w-4" />; // Default rider icon
+    return <User className="h-4 w-4" />;
   };
 
   const getRoleDescription = () => {
@@ -95,19 +95,17 @@ export default function ProfilePage() {
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-            <Button asChild variant="ghost">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
-              </Link>
-            </Button>
+        <div className="container flex h-14 items-center justify-between">
+             <h1 className="text-xl font-bold flex items-center gap-2">
+                <User className="h-6 w-6 text-primary" />
+                Rider Profile
+            </h1>
         </div>
       </header>
 
       <main className="flex w-full items-start justify-center p-4 sm:p-6 md:p-8">
         <div className="w-full max-w-2xl space-y-6">
-          <h1 className="text-3xl font-bold">Your Profile</h1>
+          <h1 className="text-3xl font-bold">Welcome, {user.displayName}!</h1>
 
           <Card>
             <CardHeader>

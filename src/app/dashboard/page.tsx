@@ -52,7 +52,7 @@ export default function DashboardPage() {
         if (response.ok) {
           const data = await response.json();
           setUserData(data);
-          if (data.role === 'boat_owner') {
+          if (data.role === 'boat_owner' || data.role === 'admin') {
             setIsOwner(true);
           }
         } else {
@@ -116,16 +116,10 @@ export default function DashboardPage() {
     <div className="min-h-dvh w-full bg-secondary/50">
        <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 font-bold">
+            <Link href="/dashboard" className="flex items-center gap-2 font-bold">
                 <Ship className="h-6 w-6 text-primary" />
                 Boat Owner Dashboard
             </Link>
-            <Button asChild variant="ghost">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Site
-              </Link>
-            </Button>
         </div>
       </header>
 

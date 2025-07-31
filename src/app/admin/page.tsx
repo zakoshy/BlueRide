@@ -131,16 +131,10 @@ export default function AdminPage() {
     <div className="min-h-dvh w-full bg-secondary/50">
        <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 font-bold">
+            <Link href="/admin" className="flex items-center gap-2 font-bold">
                 <Shield className="h-6 w-6 text-primary" />
                 Admin Dashboard
             </Link>
-            <Button asChild variant="ghost">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Site
-              </Link>
-            </Button>
         </div>
       </header>
 
