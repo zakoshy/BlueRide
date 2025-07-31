@@ -18,7 +18,7 @@ import { CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { auth } from "@/lib/firebase/config"
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, FirebaseError } from "firebase/auth"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { Separator } from "../ui/separator"
 import { Chrome, Eye, EyeOff } from "lucide-react"
@@ -84,7 +84,7 @@ export function LoginForm() {
       router.push('/');
     } catch (error: any) {
       let description = "An unknown error occurred during Google sign-in.";
-      if (error instanceof FirebaseError) {
+      if (error.code) {
         description = error.message;
       }
        toast({
@@ -106,13 +106,11 @@ export function LoginForm() {
       router.push('/');
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
-       if (error instanceof FirebaseError) {
-            if (error.code === 'auth/invalid-credential') {
-                description = "The email or password you entered is incorrect. Please double-check your credentials.";
-            } else {
-                description = error.message;
-            }
-       }
+       if (error.code === 'auth/invalid-credential') {
+            description = "The email or password you entered is incorrect. Please double-check your credentials.";
+        } else if (error.code) {
+            description = error.message;
+        }
        toast({
         title: "Login Failed",
         description: description,
