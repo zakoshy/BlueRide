@@ -65,7 +65,7 @@ export function Header() {
               {user ? (
                  <>
                   <Button asChild variant="ghost">
-                    <Link href="/profile">Profile</Link>
+                    <Link href="/profile/details">Profile</Link>
                   </Button>
                    {isBoatOwner && (
                     <Button asChild variant="ghost">
@@ -122,7 +122,7 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/profile')}>
+                  <DropdownMenuItem onClick={() => router.push('/profile/details')}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
