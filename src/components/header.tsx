@@ -65,16 +65,16 @@ export function Header() {
               {user ? (
                  <>
                   <Button asChild variant="ghost">
-                    <Link href="/profile/details">Profile</Link>
+                    <Link href="/profile">My Dashboard</Link>
                   </Button>
                    {isBoatOwner && (
                     <Button asChild variant="ghost">
-                      <Link href="/dashboard">Dashboard</Link>
+                      <Link href="/dashboard">Owner Dashboard</Link>
                     </Button>
                   )}
                    {isAdmin && (
                     <Button asChild variant="ghost">
-                      <Link href="/admin">Admin</Link>
+                      <Link href="/admin">Admin Dashboard</Link>
                     </Button>
                   )}
                   <Button variant="ghost" onClick={handleLogout}>
@@ -123,9 +123,9 @@ export function Header() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profile/details">
+                    <Link href="/profile">
                       <UserIcon className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
+                      <span>Rider Dashboard</span>
                     </Link>
                   </DropdownMenuItem>
                   {isBoatOwner && (
