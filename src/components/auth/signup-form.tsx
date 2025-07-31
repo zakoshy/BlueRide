@@ -41,10 +41,41 @@ export function SignupForm() {
     },
   })
 
+  const saveUserToDb = async (user: { uid: string; email: string | null; displayName: string | null; }) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save user to database');
+      }
+    } catch (error: any) {
+      // Even if saving to DB fails, the user is already created in Firebase.
+      // We can decide how to handle this - for now, just show a toast.
+      toast({
+        title: "Database Error",
+        description: `Your account was created, but we couldn't save your profile. ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      await saveUserToDb(result.user);
       toast({
         title: "Account Created",
         description: "Welcome to BlueRide!",
@@ -64,6 +95,7 @@ export function SignupForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, { displayName: values.name })
+        await saveUserToDb(auth.currentUser);
       }
       
       toast({
