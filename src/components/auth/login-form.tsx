@@ -51,7 +51,10 @@ export function LoginForm() {
           const profile = await response.json();
           if (profile.role === 'admin') {
             router.push('/admin');
-          } else {
+          } else if (profile.role === 'boat_owner') {
+            router.push('/dashboard');
+          }
+          else {
             router.push('/profile');
           }
         } else {
