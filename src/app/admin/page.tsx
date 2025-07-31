@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -38,6 +38,8 @@ interface Boat {
     name: string;
     capacity: number;
     description: string;
+    licenseNumber: string;
+    isValidated: boolean;
     ownerId: string;
 }
 
@@ -57,6 +59,7 @@ export default function AdminPage() {
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
   const [newBoatDescription, setNewBoatDescription] = useState('');
+  const [newBoatLicense, setNewBoatLicense] = useState('');
 
 
   const fetchUsers = useCallback(async () => {
@@ -138,15 +141,17 @@ export default function AdminPage() {
                 name: newBoatName,
                 capacity: parseInt(newBoatCapacity, 10),
                 description: newBoatDescription,
+                licenseNumber: newBoatLicense,
                 ownerId: selectedOwner.uid
             }),
         });
 
         if (response.ok) {
-            toast({ title: "Success", description: "New boat added successfully." });
+            toast({ title: "Success", description: "New boat added successfully. It is pending validation." });
             setNewBoatName('');
             setNewBoatCapacity('');
             setNewBoatDescription('');
+            setNewBoatLicense('');
             setAddBoatDialogOpen(false);
             fetchBoatsForOwner(selectedOwner.uid); // Refresh the list
         } else {
@@ -180,6 +185,28 @@ export default function AdminPage() {
         toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
     }
   };
+
+  const handleValidateBoat = async (boatId: string) => {
+    if (!selectedOwner) return;
+    try {
+        const response = await fetch(`/api/boats`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ boatId, isValidated: true }),
+        });
+
+        if (response.ok) {
+            toast({ title: "Success", description: "Boat has been validated." });
+            fetchBoatsForOwner(selectedOwner.uid); // Refresh the list
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Validation Failed", description: errorData.message || "Could not validate boat.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to validate boat", error);
+        toast({ title: "Error", description: "An unexpected error occurred during validation.", variant: "destructive" });
+    }
+  }
 
   if (loading || authLoading) {
     return (
@@ -325,11 +352,11 @@ export default function AdminPage() {
       
       {/* Manage Boats Dialog */}
        <Dialog open={isManageBoatsDialogOpen} onOpenChange={setManageBoatsDialogOpen}>
-            <DialogContent className="sm:max-w-[625px]">
+            <DialogContent className="sm:max-w-[825px]">
                 <DialogHeader>
                     <DialogTitle>Manage Boats for {selectedOwner?.name}</DialogTitle>
                     <DialogDescription>
-                        View, add, or edit boats for this owner.
+                        View, validate, add, or edit boats for this owner.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
@@ -343,7 +370,7 @@ export default function AdminPage() {
                                 <DialogHeader>
                                 <DialogTitle>Add New Boat</DialogTitle>
                                 <DialogDescription>
-                                    Fill in the details for the new boat.
+                                    Fill in the details for the new boat. It will be added as 'Pending Validation'.
                                 </DialogDescription>
                                 </DialogHeader>
                                 <form onSubmit={handleAddBoat}>
@@ -355,6 +382,10 @@ export default function AdminPage() {
                                     <div className="grid grid-cols-4 items-center gap-4">
                                         <Label htmlFor="capacity" className="text-right">Capacity</Label>
                                         <Input id="capacity" type="number" value={newBoatCapacity} onChange={(e) => setNewBoatCapacity(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="license" className="text-right">License #</Label>
+                                        <Input id="license" value={newBoatLicense} onChange={(e) => setNewBoatLicense(e.target.value)} className="col-span-3" required/>
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
                                         <Label htmlFor="description" className="text-right">Description</Label>
@@ -374,7 +405,9 @@ export default function AdminPage() {
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Capacity</TableHead>
-                                    <TableHead>Description</TableHead>
+                                    <TableHead>License #</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -382,7 +415,22 @@ export default function AdminPage() {
                                 <TableRow key={boat._id}>
                                     <TableCell className="font-medium">{boat.name}</TableCell>
                                     <TableCell>{boat.capacity}</TableCell>
-                                    <TableCell>{boat.description}</TableCell>
+                                    <TableCell className="font-mono text-xs">{boat.licenseNumber}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={boat.isValidated ? 'default' : 'secondary'} className={boat.isValidated ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                            {boat.isValidated ? 
+                                                <><CheckCircle className="mr-1 h-3 w-3"/> Validated</> : 
+                                                <><XCircle className="mr-1 h-3 w-3"/> Pending</>
+                                            }
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {!boat.isValidated && (
+                                            <Button variant="outline" size="sm" onClick={() => handleValidateBoat(boat._id)}>
+                                                Validate
+                                            </Button>
+                                        )}
+                                    </TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>

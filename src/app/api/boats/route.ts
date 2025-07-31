@@ -32,10 +32,10 @@ export async function GET(request: Request) {
 // POST a new boat
 export async function POST(request: Request) {
   try {
-    const { name, capacity, description, ownerId } = await request.json();
+    const { name, capacity, description, ownerId, licenseNumber } = await request.json();
 
-    if (!name || !capacity || !ownerId) {
-      return NextResponse.json({ message: 'Missing required fields: name, capacity, and ownerId' }, { status: 400 });
+    if (!name || !capacity || !ownerId || !licenseNumber) {
+      return NextResponse.json({ message: 'Missing required fields: name, capacity, ownerId, and licenseNumber' }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -54,6 +54,8 @@ export async function POST(request: Request) {
       capacity,
       description,
       ownerId,
+      licenseNumber,
+      isValidated: false,
       createdAt: new Date(),
     };
 
@@ -65,3 +67,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+// PUT to update a boat (e.g., for validation)
+export async function PUT(request: Request) {
+    try {
+      const { boatId, isValidated } = await request.json();
+  
+      if (!boatId || typeof isValidated !== 'boolean') {
+        return NextResponse.json({ message: 'Missing required fields: boatId and isValidated' }, { status: 400 });
+      }
+  
+      if (!ObjectId.isValid(boatId)) {
+        return NextResponse.json({ message: 'Invalid boatId provided' }, { status: 400 });
+      }
+  
+      const client = await clientPromise;
+      const db = client.db();
+      const boatsCollection = db.collection('boats');
+  
+      const result = await boatsCollection.updateOne(
+        { _id: new ObjectId(boatId) },
+        { $set: { isValidated: isValidated } }
+      );
+  
+      if (result.matchedCount === 0) {
+        return NextResponse.json({ message: 'Boat not found' }, { status: 404 });
+      }
+  
+      return NextResponse.json({ message: 'Boat validation status updated successfully' }, { status: 200 });
+    } catch (error) {
+      console.error('Error updating boat validation status:', error);
+      return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    }
+  }
