@@ -36,11 +36,11 @@ export function PersonalizedHero() {
             </div>
           </div>
           <Image
-            alt="A modern boat cruising on the water under a clear sky"
+            alt="A group of boats floating on top of a large body of water"
             className="mx-auto aspect-video overflow-hidden rounded-xl object-cover object-center shadow-2xl sm:w-full lg:order-last lg:aspect-square"
-            data-ai-hint="boat water"
+            data-ai-hint="boats harbor"
             height="550"
-            src="https://images.unsplash.com/photo-1541168028341-65447db3399b?q=80&w=2070&auto=format&fit=crop"
+            src="https://images.unsplash.com/photo-1627923769935-37651a793a39?q=80&w=2070&auto=format&fit=crop"
             width="550"
             priority
           />
