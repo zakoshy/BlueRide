@@ -18,7 +18,7 @@ import { CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { auth } from "@/lib/firebase/config"
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from "firebase/auth"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, signOut } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { Separator } from "../ui/separator"
 import { Chrome, Eye, EyeOff } from "lucide-react"
@@ -47,15 +47,16 @@ export function LoginForm() {
   })
 
   const handleSuccessfulLogin = async (user: User) => {
-    // Force a refetch of the profile to get the latest role
-    await refetchProfile();
-
     try {
-        // After refetching, the updated profile will be available.
-        // We fetch it again here to ensure we have the absolute latest data before redirecting.
         const response = await fetch(`/api/users/${user.uid}`);
         if (response.ok) {
           const profile = await response.json();
+          // Profile exists, now we can redirect based on role
+          toast({
+            title: "Login Successful",
+            description: "Welcome back!",
+          });
+          
           if (profile.role === 'admin') {
             router.push('/admin');
           } else if (profile.role === 'boat_owner') {
@@ -64,13 +65,34 @@ export function LoginForm() {
           else {
             router.push('/profile');
           }
+        } else if (response.status === 404) {
+            // User exists in Firebase, but not in our database.
+            // This is an inconsistent state, so we log them out.
+            toast({
+                title: "Login Failed",
+                description: "Your user profile could not be found. Please contact support.",
+                variant: "destructive",
+            });
+            await signOut(auth);
         } else {
-            // Default redirection if profile fetch fails
-            router.push('/profile');
+            // Another error occurred fetching the profile
+            toast({
+                title: "Login Failed",
+                description: "Could not retrieve your user profile. Please try again.",
+                variant: "destructive",
+            });
+            await signOut(auth);
         }
     } catch (error) {
         console.error("Failed to fetch user profile for redirection", error);
-        router.push('/profile'); // Fallback redirection
+        toast({
+            title: "Error",
+            description: "An unexpected error occurred during login.",
+            variant: "destructive",
+        });
+        await signOut(auth);
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
@@ -111,10 +133,6 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       await saveUserToDb(result.user);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
       await handleSuccessfulLogin(result.user);
     } catch (error: any) {
       let description = "An unknown error occurred during Google sign-in.";
@@ -126,8 +144,7 @@ export function LoginForm() {
         description: description,
         variant: "destructive",
       });
-    } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -135,10 +152,6 @@ export function LoginForm() {
     setIsSubmitting(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      })
       await handleSuccessfulLogin(userCredential.user);
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
@@ -152,8 +165,7 @@ export function LoginForm() {
         description: description,
         variant: "destructive",
       })
-    } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   }
 
