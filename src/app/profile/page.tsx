@@ -3,24 +3,21 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Ship, Star } from "lucide-react";
+import { ArrowLeft, Ship } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 export default function ProfilePage() {
-  const { user, profile, loading, refetchProfile } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
-  const { toast } = useToast();
-  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -36,42 +33,6 @@ export default function ProfilePage() {
     }
     return name.substring(0, 2).toUpperCase();
   }
-
-  const handleBecomeOwner = async () => {
-    if (!user) return;
-    setIsUpdating(true);
-    try {
-      const response = await fetch(`/api/users/${user.uid}/role`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: 'boat_owner' }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update role');
-      }
-
-      await refetchProfile();
-
-      toast({
-        title: "Success!",
-        description: "You are now registered as a boat owner. You can access the dashboard from the user menu.",
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
 
   if (loading || !user) {
     return (
@@ -153,22 +114,6 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {profile?.role === 'rider' && (
-             <Card>
-                <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Star className="text-yellow-400"/>Become a Boat Owner</CardTitle>
-                <CardDescription>
-                    Ready to list your boat and start earning? Upgrade your account to get access to the boat owner dashboard.
-                </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button onClick={handleBecomeOwner} disabled={isUpdating} size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                       {isUpdating ? 'Upgrading...' : 'Upgrade My Account'}
-                    </Button>
-                </CardContent>
-            </Card>
-          )}
-
           <Card>
             <CardHeader>
               <CardTitle>Book a Ride</CardTitle>
@@ -197,5 +142,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
