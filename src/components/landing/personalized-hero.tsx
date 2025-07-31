@@ -1,41 +1,15 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
-import { personalizeLandingPage } from '@/ai/flows/personalize-landing-page';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export function PersonalizedHero() {
-  const [greeting, setGreeting] = useState("Welcome to BlueRide");
-  const [highlight, setHighlight] = useState("Your reliable ride, just a tap away. Safe, affordable, and always on time.");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const getPersonalizedContent = async (location: string) => {
-      setLoading(true);
-      try {
-        const result = await personalizeLandingPage({ location });
-        setGreeting(result.greeting);
-        setHighlight(result.highlightedContent);
-      } catch (error) {
-        console.error("Failed to get personalized content", error);
-        // Fallback to default if AI fails
-        setGreeting("Welcome to BlueRide");
-        setHighlight("Your reliable ride, just a tap away. Safe, affordable, and always on time.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    // Using a mock location for demonstration. In a real app, this would come from 
-    // navigator.geolocation and a reverse geocoding service.
-    const mockLocation = "San Francisco";
-    getPersonalizedContent(mockLocation);
-
-  }, []);
+  const greeting = "Welcome to BlueRide";
+  const highlight = "Your reliable ride, just a tap away. Safe, affordable, and always on time.";
 
   return (
     <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
@@ -43,13 +17,6 @@ export function PersonalizedHero() {
         <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
           <div className="flex flex-col justify-center space-y-6">
             <div className="space-y-4">
-              {loading ? (
-                <>
-                  <Skeleton className="h-12 w-3/4 rounded-lg" />
-                  <Skeleton className="h-8 w-full rounded-lg" />
-                  <Skeleton className="h-8 w-5/6 rounded-lg" />
-                </>
-              ) : (
                 <>
                   <h1 className="font-headline text-4xl font-extrabold tracking-tighter sm:text-5xl xl:text-6xl/none">
                     {greeting}
@@ -58,7 +25,6 @@ export function PersonalizedHero() {
                     {highlight}
                   </p>
                 </>
-              )}
             </div>
             <div className="flex flex-col gap-2 min-[400px]:flex-row">
                <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg transition-transform hover:scale-105">
