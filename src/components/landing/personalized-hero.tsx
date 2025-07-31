@@ -40,7 +40,7 @@ export function PersonalizedHero() {
             className="mx-auto aspect-video overflow-hidden rounded-xl object-cover object-center shadow-2xl sm:w-full lg:order-last lg:aspect-square"
             data-ai-hint="boats harbor"
             height="550"
-            src="https://images.unsplash.com/photo-1627923769935-37651a793a39?q=80&w=2070&auto=format&fit=crop"
+            src="https://images.unsplash.com/photo-1720353099233-1402283a3356?q=80&w=2070&auto=format&fit=crop"
             width="550"
             priority
           />
