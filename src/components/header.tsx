@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Car, LogOut, User as UserIcon } from 'lucide-react';
+import { Menu, Car, LogOut, User as UserIcon, Ship } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase/config';
 import { signOut } from 'firebase/auth';
@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 export function Header() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -29,6 +29,8 @@ export function Header() {
     }
     return name.substring(0, 2).toUpperCase();
   }
+
+  const isBoatOwner = profile?.role === 'boat_owner';
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -64,6 +66,11 @@ export function Header() {
                   <Button asChild variant="ghost">
                     <Link href="/profile">Profile</Link>
                   </Button>
+                   {isBoatOwner && (
+                    <Button asChild variant="ghost">
+                      <Link href="/dashboard">Dashboard</Link>
+                    </Button>
+                  )}
                   <Button variant="ghost" onClick={handleLogout}>
                     Log Out
                   </Button>
@@ -113,6 +120,12 @@ export function Header() {
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
+                  {isBoatOwner && (
+                     <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                        <Ship className="mr-2 h-4 w-4" />
+                        <span>Owner Dashboard</span>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
