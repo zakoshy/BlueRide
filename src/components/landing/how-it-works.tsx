@@ -44,11 +44,11 @@ export function HowItWorks() {
           </div>
         </div>
         <Image
-          alt="Coastal town harbor with boats"
+          alt="Boats docked on a sandy beach"
           className="mx-auto aspect-square overflow-hidden rounded-xl object-cover object-center shadow-lg sm:w-full"
-          data-ai-hint="coastal town boats"
+          data-ai-hint="beach boats"
           height="550"
-          src="https://plus.unsplash.com/premium_photo-1680195157754-52d923a4f0f0?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NDA4fHxrZW55YSUyMGNvYXN0JTIwYm9hdHMlMjBwaWN0dXJlc3xlbnwwfHwwfHx8MA%3D%3D"
+          src="https://images.unsplash.com/photo-1744912049599-35429210439e?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
           width="550"
         />
       </div>
