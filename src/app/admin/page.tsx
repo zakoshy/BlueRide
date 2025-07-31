@@ -81,8 +81,6 @@ export default function AdminPage() {
     return name.substring(0, 2).toUpperCase();
   }
 
-  const isBoatOwner = profile?.role === 'boat_owner';
-
   const handleRoleChange = async (uid: string, newRole: string) => {
     try {
       const response = await fetch(`/api/admin/users`, {
@@ -170,37 +168,12 @@ export default function AdminPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {user.email}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profile">
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      <span>Rider Dashboard</span>
+                    <Link href="/admin">
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span>Admin Dashboard</span>
                     </Link>
                   </DropdownMenuItem>
-                  {isBoatOwner && (
-                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard">
-                        <Ship className="mr-2 h-4 w-4" />
-                        <span>Owner Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  {isAdmin && (
-                     <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
