@@ -3,19 +3,24 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Ship, Star } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 export default function ProfilePage() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading, refetchProfile } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -32,9 +37,45 @@ export default function ProfilePage() {
     return name.substring(0, 2).toUpperCase();
   }
 
+  const handleBecomeOwner = async () => {
+    if (!user) return;
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/users/${user.uid}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: 'boat_owner' }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update role');
+      }
+
+      await refetchProfile();
+
+      toast({
+        title: "Success!",
+        description: "You are now registered as a boat owner. You can access the dashboard from the user menu.",
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+
   if (loading || !user) {
     return (
-       <div className="flex min-h-dvh w-full items-center justify-center bg-background p-4">
+       <div className="flex min-h-dvh w-full items-center justify-center bg-secondary/50 p-4">
         <div className="w-full max-w-2xl space-y-6">
           <Skeleton className="h-8 w-48" />
           <Card>
@@ -71,7 +112,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-dvh w-full bg-background">
+    <div className="min-h-dvh w-full bg-secondary/50">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
             <Button asChild variant="ghost">
@@ -90,7 +131,7 @@ export default function ProfilePage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
+                <Avatar className="h-16 w-16 border-2 border-primary">
                   <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User'} />
                   <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
                 </Avatar>
@@ -100,7 +141,33 @@ export default function ProfilePage() {
                 </div>
               </div>
             </CardHeader>
+             <CardContent>
+                <Alert>
+                    <Ship className="h-4 w-4" />
+                    <AlertTitle>Account Status</AlertTitle>
+                    <AlertDescription>
+                        You are currently a <span className="font-semibold capitalize">{profile?.role || 'rider'}.</span> 
+                        {profile?.role === 'boat_owner' && " You can manage your fleet from the Owner Dashboard."}
+                    </AlertDescription>
+                </Alert>
+            </CardContent>
           </Card>
+
+          {profile?.role === 'rider' && (
+             <Card>
+                <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Star className="text-yellow-400"/>Become a Boat Owner</CardTitle>
+                <CardDescription>
+                    Ready to list your boat and start earning? Upgrade your account to get access to the boat owner dashboard.
+                </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button onClick={handleBecomeOwner} disabled={isUpdating} size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                       {isUpdating ? 'Upgrading...' : 'Upgrade My Account'}
+                    </Button>
+                </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -119,7 +186,7 @@ export default function ProfilePage() {
                   <Label htmlFor="dropoff">Drop-off Location</Label>
                   <Input id="dropoff" placeholder="e.g., Takawiri Island" />
                 </div>
-                <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
                   Search for Boats
                 </Button>
               </form>
@@ -130,3 +197,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
