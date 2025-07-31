@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 export function PersonalizedHero() {
   const greeting = "Welcome to BlueRide";
-  const highlight = "Your reliable ride, just a tap away. Safe, affordable, and always on time.";
+  const highlight = "Your reliable water ride, just a tap away. Safe, affordable, and always on time.";
 
   return (
     <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
