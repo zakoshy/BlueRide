@@ -219,7 +219,7 @@ export default function AdminPage() {
                        <Select
                           defaultValue={u.role}
                           onValueChange={(newRole) => handleRoleChange(u.uid, newRole)}
-                          disabled={u.uid === user.uid} // Admin can't change their own role
+                          disabled={user ? u.uid === user.uid : false} // Admin can't change their own role
                         >
                           <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="Select a role" />
