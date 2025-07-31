@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Car, LogOut, User as UserIcon, Ship } from 'lucide-react';
+import { Menu, Car, LogOut, User as UserIcon, Ship, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase/config';
 import { signOut } from 'firebase/auth';
@@ -31,6 +31,7 @@ export function Header() {
   }
 
   const isBoatOwner = profile?.role === 'boat_owner';
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -69,6 +70,11 @@ export function Header() {
                    {isBoatOwner && (
                     <Button asChild variant="ghost">
                       <Link href="/dashboard">Dashboard</Link>
+                    </Button>
+                  )}
+                   {isAdmin && (
+                    <Button asChild variant="ghost">
+                      <Link href="/admin">Admin</Link>
                     </Button>
                   )}
                   <Button variant="ghost" onClick={handleLogout}>
@@ -124,6 +130,12 @@ export function Header() {
                      <DropdownMenuItem onClick={() => router.push('/dashboard')}>
                         <Ship className="mr-2 h-4 w-4" />
                         <span>Owner Dashboard</span>
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                     <DropdownMenuItem onClick={() => router.push('/admin')}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin Dashboard</span>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />

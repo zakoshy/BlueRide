@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Ship } from "lucide-react";
+import { ArrowLeft, Ship, Shield } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -72,6 +72,26 @@ export default function ProfilePage() {
     )
   }
 
+  const getRoleIcon = () => {
+    if (profile?.role === 'admin') {
+      return <Shield className="h-4 w-4" />;
+    }
+    if (profile?.role === 'boat_owner') {
+      return <Ship className="h-4 w-4" />;
+    }
+    return <Ship className="h-4 w-4" />; // Default rider icon
+  };
+
+  const getRoleDescription = () => {
+    if (profile?.role === 'admin') {
+      return "You have administrator privileges. You can manage users from the Admin Dashboard.";
+    }
+    if (profile?.role === 'boat_owner') {
+      return "You can manage your fleet from the Owner Dashboard.";
+    }
+    return "You can book rides and manage your trips.";
+  };
+
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -104,11 +124,11 @@ export default function ProfilePage() {
             </CardHeader>
              <CardContent>
                 <Alert>
-                    <Ship className="h-4 w-4" />
+                    {getRoleIcon()}
                     <AlertTitle>Account Status</AlertTitle>
                     <AlertDescription>
-                        You are currently a <span className="font-semibold capitalize">{profile?.role || 'rider'}.</span> 
-                        {profile?.role === 'boat_owner' && " You can manage your fleet from the Owner Dashboard."}
+                        You are currently a <span className="font-semibold capitalize">{profile?.role?.replace('_', ' ') || 'rider'}.</span>
+                        {" "}{getRoleDescription()}
                     </AlertDescription>
                 </Alert>
             </CardContent>
