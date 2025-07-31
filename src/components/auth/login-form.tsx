@@ -1,3 +1,4 @@
+
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -16,22 +17,21 @@ import { Input } from "@/components/ui/input"
 import { CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import { auth } from "@/lib/firebase/config"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { useRouter } from "next/navigation"
+import { Separator } from "../ui/separator"
+import { Chrome } from "lucide-react"
+
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
   password: z.string().min(1, { message: "Password is required." }),
 })
 
-async function handleLogin(values: z.infer<typeof formSchema>) {
-  "use server"
-  console.log("Login attempt with:", values)
-  // In a real application, you would add your Firebase authentication logic here.
-  // For this demo, we'll simulate a successful login.
-  return { success: true, message: "Logged in successfully (simulated)." }
-}
-
 export function LoginForm() {
   const { toast } = useToast()
+  const router = useRouter()
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -40,18 +40,36 @@ export function LoginForm() {
     },
   })
 
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      toast({
+        title: "Login Successful",
+        description: "Welcome back!",
+      });
+      router.push('/');
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    const result = await handleLogin(values)
-    if (result.success) {
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password)
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       })
-      // Here you would typically redirect the user, e.g., router.push('/dashboard')
-    } else {
+      router.push('/');
+    } catch (error: any) {
        toast({
         title: "Login Failed",
-        description: result.message,
+        description: error.message,
         variant: "destructive",
       })
     }
@@ -59,8 +77,22 @@ export function LoginForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <CardContent className="space-y-4 pt-6">
+       <CardContent className="space-y-4 pt-6">
+          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+            <Chrome className="mr-2 h-4 w-4" />
+            Sign in with Google
+          </Button>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">
+                Or continue with
+              </span>
+            </div>
+          </div>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
             name="email"
@@ -87,11 +119,12 @@ export function LoginForm() {
               </FormItem>
             )}
           />
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+           <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Signing In..." : "Sign In"}
           </Button>
+      </form>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4">
           <p className="text-sm text-center text-muted-foreground">
             Don't have an account?{" "}
             <Link href="/signup" className="font-semibold text-primary underline-offset-4 hover:underline">
@@ -99,7 +132,6 @@ export function LoginForm() {
             </Link>
           </p>
         </CardFooter>
-      </form>
     </Form>
   )
 }
