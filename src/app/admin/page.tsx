@@ -155,9 +155,9 @@ export default function AdminPage() {
                 Admin Dashboard
             </Link>
              <nav className="flex items-center gap-2">
-             {loading ? (
+             {loading || !user ? (
               <div className="h-10 w-28 animate-pulse rounded-md bg-muted" />
-            ) : user ? (
+            ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -181,7 +181,7 @@ export default function AdminPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : null}
+            )}
           </nav>
         </div>
       </header>
