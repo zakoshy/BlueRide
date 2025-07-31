@@ -18,7 +18,7 @@ import { CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { auth } from "@/lib/firebase/config"
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, FirebaseError } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { Separator } from "../ui/separator"
 import { Chrome, Eye, EyeOff } from "lucide-react"
@@ -34,6 +34,8 @@ export function LoginForm() {
   const { toast } = useToast()
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -43,8 +45,6 @@ export function LoginForm() {
   })
 
   const saveUserToDb = async (user: { uid: string; email: string | null; displayName: string | null; }) => {
-    // This function can be called for both new and existing users on Google sign-in.
-    // The backend API handles the logic of creating or updating the user record.
     try {
       const response = await fetch('/api/users', {
         method: 'POST',
@@ -76,7 +76,6 @@ export function LoginForm() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      // Save/update user info in MongoDB on every Google sign-in
       await saveUserToDb(result.user);
       toast({
         title: "Login Successful",
@@ -84,15 +83,20 @@ export function LoginForm() {
       });
       router.push('/');
     } catch (error: any) {
-      toast({
+      let description = "An unknown error occurred during Google sign-in.";
+      if (error instanceof FirebaseError) {
+        description = error.message;
+      }
+       toast({
         title: "Login Failed",
-        description: error.message,
+        description: description,
         variant: "destructive",
       });
     }
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password)
       toast({
@@ -101,11 +105,21 @@ export function LoginForm() {
       })
       router.push('/');
     } catch (error: any) {
+       let description = "An unexpected error occurred. Please try again.";
+       if (error instanceof FirebaseError) {
+            if (error.code === 'auth/invalid-credential') {
+                description = "The email or password you entered is incorrect. Please double-check your credentials.";
+            } else {
+                description = error.message;
+            }
+       }
        toast({
         title: "Login Failed",
-        description: error.message,
+        description: description,
         variant: "destructive",
       })
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
@@ -165,8 +179,8 @@ export function LoginForm() {
               </FormItem>
             )}
           />
-           <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Signing In..." : "Sign In"}
+           <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Signing In..." : "Sign In"}
           </Button>
       </form>
         </CardContent>
