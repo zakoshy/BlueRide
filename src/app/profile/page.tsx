@@ -18,14 +18,14 @@ import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 
 // Define types for our data structures
-interface Route {
+interface Location {
   _id: string;
   name: string;
-  pickup: string;
-  destination: string;
+  county: string;
+  area: string;
 }
 
-interface Location {
+interface ComboboxOption {
     value: string;
     label: string;
 }
@@ -42,7 +42,8 @@ interface Boat {
 interface Booking {
     boatId: string;
     riderId: string;
-    routeId: string; // This might change to pickup/destination strings
+    pickup: string;
+    destination: string;
     bookingType: 'seat' | 'whole_boat';
     seats?: number;
     status: 'pending' | 'confirmed' | 'cancelled';
@@ -53,7 +54,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [locations, setLocations] = useState<ComboboxOption[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
   const [pickup, setPickup] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
@@ -71,18 +72,13 @@ export default function ProfilePage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    // Fetch all available routes and derive unique locations
+    // Fetch all available locations
     const fetchLocations = async () => {
       try {
-        const response = await fetch('/api/routes');
+        const response = await fetch('/api/routes'); // The endpoint still points to /api/routes
         if (response.ok) {
-          const data: Route[] = await response.json();
-          const uniqueLocations = new Set<string>();
-          data.forEach(route => {
-            uniqueLocations.add(route.pickup);
-            uniqueLocations.add(route.destination);
-          });
-          setLocations(Array.from(uniqueLocations).map(loc => ({ value: loc.toLowerCase(), label: loc })));
+          const data: Location[] = await response.json();
+          setLocations(data.map(loc => ({ value: loc.name.toLowerCase(), label: `${loc.name} (${loc.area})` })));
         } else {
           toast({ title: "Error", description: "Could not fetch available locations.", variant: "destructive" });
         }
@@ -133,14 +129,13 @@ export default function ProfilePage() {
         return;
     }
     
-    // This part is tricky as we don't have a routeId. We will need to adjust the backend.
-    // For now, let's send a placeholder. This will fail until the backend is updated.
-    const placeholderRouteId = "665b2064a382582855520f92";
-
-    const bookingDetails: Omit<Booking, 'status'> = {
+    // The backend for bookings needs to be updated to accept pickup/destination strings
+    // instead of a routeId. This will require changes in /api/bookings/route.ts
+    const bookingDetails = {
         boatId: selectedBoat._id,
         riderId: user.uid,
-        routeId: placeholderRouteId, // Needs backend change
+        pickup: locations.find(l => l.value === pickup)?.label,
+        destination: locations.find(l => l.value === destination)?.label,
         bookingType: bookingType,
         ...(bookingType === 'seat' && { seats: numSeats }),
     };

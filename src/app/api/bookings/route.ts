@@ -6,9 +6,9 @@ import { ObjectId } from 'mongodb';
 // POST a new booking
 export async function POST(request: Request) {
   try {
-    const { boatId, riderId, routeId, bookingType, seats } = await request.json();
+    const { boatId, riderId, pickup, destination, bookingType, seats } = await request.json();
 
-    if (!boatId || !riderId || !routeId || !bookingType) {
+    if (!boatId || !riderId || !pickup || !destination || !bookingType) {
       return NextResponse.json({ message: 'Missing required booking fields' }, { status: 400 });
     }
 
@@ -33,18 +33,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Rider profile not found.' }, { status: 404 });
     }
     
-    // In a real app we'd also check the routeId, but we'll skip for now.
-
+    // We now use pickup and destination strings directly
     if (bookingType === 'seat' && seats > boat.capacity) {
         return NextResponse.json({ message: `Number of seats exceeds boat capacity of ${boat.capacity}.` }, { status: 400 });
     }
-
 
     const newBooking = {
       boatId: new ObjectId(boatId),
       riderId: rider.uid,
       ownerId: boat.ownerId, // Store owner for easy lookup
-      routeId: new ObjectId(routeId),
+      pickup,
+      destination,
       bookingType,
       ...(seats && { seats }), // Conditionally add seats
       status: 'pending', // Bookings are pending until owner confirms
