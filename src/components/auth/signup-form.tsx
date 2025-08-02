@@ -18,7 +18,7 @@ import { CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { auth } from "@/lib/firebase/config"
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { Chrome, Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
@@ -62,8 +62,6 @@ export function SignupForm() {
         throw new Error(errorData.message || 'Failed to save user to database');
       }
     } catch (error: any) {
-      // Even if saving to DB fails, the user is already created in Firebase.
-      // We can decide how to handle this - for now, just show a toast.
       toast({
         title: "Database Error",
         description: `Your account was created, but we couldn't save your profile. ${error.message}`,
@@ -95,7 +93,6 @@ export function SignupForm() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
-      // The user is available in userCredential.user, not auth.currentUser immediately
       const user = userCredential.user;
       if (user) {
         await updateProfile(user, { displayName: values.name })
@@ -114,15 +111,37 @@ export function SignupForm() {
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
        if (error.code === 'auth/email-already-in-use') {
-            description = "This email address is already registered. Please try logging in instead.";
+            // This case handles when a user exists in Firebase Auth but maybe not in our DB (e.g., deleted from DB).
+            // We can try to log them in and create their DB profile.
+            description = "This email is already registered. Attempting to log you in instead.";
+            toast({
+                title: "Existing Account",
+                description: description,
+            });
+            try {
+                const loginCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+                await saveUserToDb({
+                    uid: loginCredential.user.uid,
+                    email: loginCredential.user.email,
+                    displayName: values.name, // Use the new name they provided
+                });
+                await updateProfile(loginCredential.user, { displayName: values.name });
+                router.push('/profile');
+            } catch (loginError: any) {
+                 toast({
+                    title: "Login Failed",
+                    description: "We found an account with this email, but the password was incorrect.",
+                    variant: "destructive",
+                });
+            }
        } else if (error.code) {
            description = error.message;
+            toast({
+                title: "Signup Failed",
+                description: description,
+                variant: "destructive",
+            });
        }
-       toast({
-        title: "Signup Failed",
-        description: description,
-        variant: "destructive",
-      })
     }
   }
 
