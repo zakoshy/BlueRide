@@ -3,17 +3,16 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, Anchor, Waves, ArrowRight, User as UserIcon, Calendar as CalendarIcon, Sailboat } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -27,7 +26,7 @@ interface Location {
 
 interface ComboboxOption {
     value: string;
-    label: string;
+    label:string;
 }
 
 interface Boat {
@@ -37,16 +36,6 @@ interface Boat {
   licenseNumber: string;
   ownerId: string;
   isValidated: boolean;
-}
-
-interface Booking {
-    boatId: string;
-    riderId: string;
-    pickup: string;
-    destination: string;
-    bookingType: 'seat' | 'whole_boat';
-    seats?: number;
-    status: 'pending' | 'confirmed' | 'cancelled';
 }
 
 export default function ProfilePage() {
@@ -75,7 +64,7 @@ export default function ProfilePage() {
     // Fetch all available locations
     const fetchLocations = async () => {
       try {
-        const response = await fetch('/api/routes'); // The endpoint still points to /api/routes
+        const response = await fetch('/api/routes');
         if (response.ok) {
           const data: Location[] = await response.json();
           setLocations(data.map(loc => ({ value: loc.name.toLowerCase(), label: `${loc.name} (${loc.area})` })));
@@ -102,9 +91,8 @@ export default function ProfilePage() {
     setIsFinding(true);
     setBoats([]);
     try {
-      // In a real app, you'd fetch boats available for the selected route.
-      // For now, we fetch all validated boats as a stand-in. This logic needs to be updated
-      // once the backend supports querying routes by pickup/destination.
+      // For now, we fetch all validated boats.
+      // A real application would filter boats based on the selected route.
       const response = await fetch(`/api/boats?validated=true`);
       if (response.ok) {
         const data = await response.json();
@@ -129,8 +117,6 @@ export default function ProfilePage() {
         return;
     }
     
-    // The backend for bookings needs to be updated to accept pickup/destination strings
-    // instead of a routeId. This will require changes in /api/bookings/route.ts
     const bookingDetails = {
         boatId: selectedBoat._id,
         riderId: user.uid,
@@ -161,6 +147,11 @@ export default function ProfilePage() {
     } catch (error) {
         toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
     }
+  }
+
+  const handleOpenBookingDialog = (boat: Boat) => {
+    setSelectedBoat(boat);
+    setIsBookingDialogOpen(true);
   }
 
 
@@ -245,24 +236,20 @@ export default function ProfilePage() {
                 <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locations.find(l=>l.value === destination)?.label}</span></h2>
                 <div className="grid gap-6 md:grid-cols-2">
                     {boats.map(boat => (
-                         <Dialog key={boat._id} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null) }}>
-                           <DialogTrigger asChild>
-                                <Card className="flex flex-col cursor-pointer hover:border-primary transition-colors">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
-                                        <CardDescription>A reliable boat ready for your trip.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="flex-grow">
-                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                            <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
-                                        </div>
-                                    </CardContent>
-                                    <CardFooter>
-                                        <Button className="w-full" onClick={() => setSelectedBoat(boat)}>Book a trip</Button>
-                                    </CardFooter>
-                                </Card>
-                            </DialogTrigger>
-                         </Dialog>
+                        <Card key={boat._id} className="flex flex-col cursor-pointer hover:border-primary transition-colors">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
+                                <CardDescription>A reliable boat ready for your trip.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex-grow">
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>Book a trip</Button>
+                            </CardFooter>
+                        </Card>
                     ))}
                 </div>
             </div>
@@ -270,7 +257,7 @@ export default function ProfilePage() {
         </div>
       </main>
 
-       <Dialog open={isBookingDialogOpen || !!selectedBoat} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null); setIsBookingDialogOpen(isOpen); }}>
+       <Dialog open={isBookingDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null); setIsBookingDialogOpen(isOpen); }}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Book Your Trip on {selectedBoat?.name}</DialogTitle>
@@ -305,10 +292,10 @@ export default function ProfilePage() {
                     </div>
                 )}
             </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setSelectedBoat(null)}>Cancel</Button>
+            <CardFooter className="justify-end gap-2">
+              <Button variant="ghost" onClick={() => setIsBookingDialogOpen(false)}>Cancel</Button>
               <Button onClick={handleBookingSubmit}>Confirm Booking</Button>
-            </DialogFooter>
+            </CardFooter>
           </DialogContent>
         </Dialog>
     </div>

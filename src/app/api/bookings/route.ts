@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Rider profile not found.' }, { status: 404 });
     }
     
-    // We now use pickup and destination strings directly
+    // Check boat capacity
     if (bookingType === 'seat' && seats > boat.capacity) {
         return NextResponse.json({ message: `Number of seats exceeds boat capacity of ${boat.capacity}.` }, { status: 400 });
     }
