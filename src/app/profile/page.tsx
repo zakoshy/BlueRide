@@ -95,7 +95,7 @@ export default function ProfilePage() {
         const data = await response.json();
         setBoats(data);
         if (data.length === 0) {
-           toast({ title: "No Boats Found", description: "There are currently no boats available for this route.", variant: "secondary" });
+           toast({ title: "No Boats Found", description: "There are currently no boats available for this route. Please check back later.", variant: "default" });
         }
       } else {
         toast({ title: "Error", description: "Could not fetch available boats.", variant: "destructive" });
@@ -189,7 +189,7 @@ export default function ProfilePage() {
             <CardContent>
                 <div className="grid w-full gap-1.5">
                     <Label htmlFor="route">Select Your Route</Label>
-                    <Select onValueChange={handleRouteSelection} value={selectedRouteId || undefined}>
+                    <Select onValueChange={handleRouteSelection} value={selectedRouteId || ""}>
                         <SelectTrigger id="route">
                             <SelectValue placeholder="Select a pickup and destination..." />
                         </SelectTrigger>
@@ -227,22 +227,22 @@ export default function ProfilePage() {
                 <div className="grid gap-6 md:grid-cols-2">
                     {boats.map(boat => (
                          <Dialog key={boat._id} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null) }}>
-                            <Card className="flex flex-col">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
-                                    <CardDescription>A reliable boat ready for your trip.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="flex-grow">
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                        <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
-                                    </div>
-                                </CardContent>
-                                <CardFooter>
-                                    <DialogTrigger asChild>
+                           <DialogTrigger asChild>
+                                <Card className="flex flex-col cursor-pointer hover:border-primary transition-colors">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
+                                        <CardDescription>A reliable boat ready for your trip.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex-grow">
+                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                            <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
+                                        </div>
+                                    </CardContent>
+                                    <CardFooter>
                                         <Button className="w-full" onClick={() => setSelectedBoat(boat)}>Book a trip</Button>
-                                    </DialogTrigger>
-                                </CardFooter>
-                            </Card>
+                                    </CardFooter>
+                                </Card>
+                            </DialogTrigger>
                          </Dialog>
                     ))}
                 </div>
@@ -295,3 +295,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
