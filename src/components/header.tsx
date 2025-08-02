@@ -122,28 +122,33 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile">
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      <span>Rider Dashboard</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  {isBoatOwner && (
-                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard">
-                        <Ship className="mr-2 h-4 w-4" />
-                        <span>Owner Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  {isAdmin && (
-                     <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
+                    {isAdmin ? (
+                        <>
+                         <DropdownMenuItem asChild>
+                          <Link href="/admin">
+                            <Shield className="mr-2 h-4 w-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        </>
+                    ) : (
+                        <>
+                        <DropdownMenuItem asChild>
+                            <Link href="/profile">
+                            <UserIcon className="mr-2 h-4 w-4" />
+                            <span>Rider Dashboard</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        {isBoatOwner && (
+                            <DropdownMenuItem asChild>
+                            <Link href="/dashboard">
+                                <Ship className="mr-2 h-4 w-4" />
+                                <span>Owner Dashboard</span>
+                            </Link>
+                            </DropdownMenuItem>
+                        )}
+                        </>
+                    )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
