@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
+import { Combobox } from "@/components/ui/combobox";
 
 
 interface ManagedUser {
@@ -265,7 +266,7 @@ export default function AdminPage() {
   }
   
   const riderUsers = users.filter(u => u.role === 'rider');
-
+  const riderOptions = riderUsers.map(u => ({ value: u.uid, label: `${u.name} (${u.email})`}));
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -331,28 +332,17 @@ export default function AdminPage() {
                     <form onSubmit={handlePromoteUser}>
                         <div className="grid gap-4 py-4">
                            <Label htmlFor="user-to-promote">Select Rider</Label>
-                           <Select onValueChange={setUserToPromote} value={userToPromote}>
-                             <SelectTrigger id="user-to-promote">
-                               <SelectValue placeholder="Select a user to promote..." />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {riderUsers.length > 0 ? (
-                                   riderUsers.map(u => (
-                                     <SelectItem key={u.uid} value={u.uid}>
-                                         <div className="flex flex-col">
-                                            <span className="font-medium">{u.name}</span>
-                                            <span className="text-xs text-muted-foreground">{u.email}</span>
-                                         </div>
-                                     </SelectItem>
-                                   ))
-                               ) : (
-                                <SelectItem value="none" disabled>No riders available to promote</SelectItem>
-                               )}
-                             </SelectContent>
-                           </Select>
+                           <Combobox
+                                options={riderOptions}
+                                selectedValue={userToPromote}
+                                onSelect={setUserToPromote}
+                                placeholder="Select a user to promote..."
+                                searchPlaceholder="Search riders..."
+                                notFoundText="No riders available."
+                            />
                         </div>
                         <DialogFooter>
-                            <Button type="submit" disabled={!userToPromote || userToPromote === 'none'}>Promote to Boat Owner</Button>
+                            <Button type="submit" disabled={!userToPromote}>Promote to Boat Owner</Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
