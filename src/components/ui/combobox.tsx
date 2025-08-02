@@ -65,7 +65,7 @@ export function Combobox({
                   key={option.value}
                   value={option.label} // Allow searching by label
                   onSelect={(currentValue) => {
-                    const selectedOption = options.find(opt => opt.label.toLowerCase() === currentValue);
+                    const selectedOption = options.find(opt => opt.label.toLowerCase() === currentValue.toLowerCase());
                     if (selectedOption) {
                       onSelect(selectedOption.value === selectedValue ? "" : selectedOption.value)
                     }
