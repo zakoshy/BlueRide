@@ -6,7 +6,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 
 interface UserProfile {
-  role?: 'rider' | 'boat_owner' | 'admin';
+  role?: 'rider' | 'boat_owner' | 'admin' | 'captain';
   // Add other profile fields here as needed
 }
 
@@ -71,3 +71,5 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+
+    

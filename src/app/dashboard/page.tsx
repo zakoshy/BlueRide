@@ -3,71 +3,221 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState, useCallback } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Header } from "@/components/header";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Combobox } from "@/components/ui/combobox";
+import type { User as FirebaseUser } from "firebase/auth";
 
-// Mock data - replace with actual data from your API
-const mockBoats = [
-  { id: 1, name: "Sea Serpent", capacity: 8, status: "active" },
-  { id: 2, name: "Ocean's Grace", capacity: 12, status: "maintenance" },
-];
+interface UserProfile {
+  _id: string;
+  uid: string;
+  name: string;
+  email: string;
+  role: 'rider' | 'boat_owner' | 'admin' | 'captain';
+  createdAt: string;
+}
 
-const mockBookings = [
-    { id: 1, rider: "Alice", boat: "Sea Serpent", status: "pending", date: "2024-08-15" },
-    { id: 2, rider: "Bob", boat: "Sea Serpent", status: "accepted", date: "2024-08-16" },
-    { id: 3, rider: "Charlie", boat: "Ocean's Grace", status: "pending", date: "2024-08-17" },
-];
+interface Boat {
+    _id: string;
+    name: string;
+    capacity: number;
+    description: string;
+    licenseNumber: string;
+    isValidated: boolean;
+    ownerId: string;
+    captainId?: string;
+}
 
+interface Booking {
+    _id: string;
+    boatId: string;
+    riderId: string;
+    pickup: string;
+    destination: string;
+    bookingType: 'seat' | 'whole_boat';
+    seats?: number;
+    status: 'pending' | 'accepted' | 'rejected';
+    createdAt: string;
+    rider?: { name: string };
+    boat?: { name: string };
+}
+
+interface Captain {
+    uid: string;
+    name: string;
+    email: string;
+}
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
   const [isOwner, setIsOwner] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [boats, setBoats] = useState<Boat[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [captains, setCaptains] = useState<Captain[]>([]);
+
+  const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
+  const [newBoatName, setNewBoatName] = useState('');
+  const [newBoatCapacity, setNewBoatCapacity] = useState('');
+  const [newBoatDescription, setNewBoatDescription] = useState('');
+  const [newBoatLicense, setNewBoatLicense] = useState('');
+
+  const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
+    if (!currentUser) return;
+    
+    // Fetch boats
+    try {
+        const boatsResponse = await fetch(`/api/boats?ownerId=${currentUser.uid}`);
+        if (boatsResponse.ok) {
+            const boatsData = await boatsResponse.json();
+            setBoats(boatsData);
+        } else {
+            toast({ title: "Error", description: "Failed to fetch your boats.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to fetch boats", error);
+        toast({ title: "Error", description: "An unexpected error occurred while fetching your boats.", variant: "destructive" });
+    }
+
+    // Fetch bookings
+     try {
+        const bookingsResponse = await fetch(`/api/bookings/owner/${currentUser.uid}`);
+        if (bookingsResponse.ok) {
+            const bookingsData = await bookingsResponse.json();
+            setBookings(bookingsData);
+        } else {
+            toast({ title: "Error", description: "Failed to fetch your bookings.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to fetch bookings", error);
+        toast({ title: "Error", description: "An unexpected error occurred while fetching your bookings.", variant: "destructive" });
+    }
+
+    // Fetch captains
+    try {
+        const captainsResponse = await fetch('/api/captains');
+        if(captainsResponse.ok) {
+            const captainsData = await captainsResponse.json();
+            setCaptains(captainsData);
+        } else {
+            toast({ title: "Error", description: "Could not fetch list of captains.", variant: "destructive" });
+        }
+    } catch(error) {
+         console.error("Failed to fetch captains", error);
+         toast({ title: "Error", description: "An unexpected error occurred while fetching captains.", variant: "destructive" });
+    }
+
+  }, [toast]);
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
+    if (authLoading) return;
     if (!user) {
       router.push('/login');
       return;
     }
+    if (profile?.role === 'boat_owner' || profile?.role === 'admin') {
+      setIsOwner(true);
+      fetchOwnerData(user);
+    } else {
+      router.push('/profile');
+    }
+    setLoading(false);
+  }, [user, profile, authLoading, router, fetchOwnerData]);
 
-    const fetchUserData = async () => {
-      try {
-        const response = await fetch(`/api/users/${user.uid}`);
+
+  const handleAddBoat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    try {
+        const response = await fetch('/api/boats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: newBoatName,
+                capacity: parseInt(newBoatCapacity, 10),
+                description: newBoatDescription,
+                licenseNumber: newBoatLicense,
+                ownerId: user.uid
+            }),
+        });
+
         if (response.ok) {
-          const data = await response.json();
-          setUserData(data);
-          if (data.role === 'boat_owner' || data.role === 'admin') {
-            setIsOwner(true);
-          }
+            toast({ title: "Success", description: "New boat added successfully. It is pending validation from an admin." });
+            setNewBoatName('');
+            setNewBoatCapacity('');
+            setNewBoatDescription('');
+            setNewBoatLicense('');
+            setAddBoatDialogOpen(false);
+            fetchOwnerData(user); // Refresh the list
         } else {
-            setUserData(null);
+            const errorData = await response.json();
+            toast({ title: "Add Failed", description: errorData.message || "Could not add boat.", variant: "destructive" });
         }
-      } catch (error) {
-        console.error("Failed to fetch user data", error);
-        setUserData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+    } catch (error) {
+        console.error("Failed to add boat", error);
+        toast({ title: "Error", description: "An unexpected error occurred while adding the boat.", variant: "destructive" });
+    }
+  }
 
-    fetchUserData();
-  }, [user, authLoading, router]);
+  const handleBookingStatusChange = async (bookingId: string, status: 'accepted' | 'rejected') => {
+    try {
+        const response = await fetch(`/api/bookings/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId, status }),
+        });
+
+        if (response.ok) {
+            toast({ title: "Success", description: `Booking has been ${status}.` });
+            if (user) fetchOwnerData(user); // Refresh bookings
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Update Failed", description: errorData.message || "Could not update booking status.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to update booking status", error);
+        toast({ title: "Error", description: "An unexpected error occurred during status update.", variant: "destructive" });
+    }
+  };
+
+  const handleAssignCaptain = async (boatId: string, captainId: string) => {
+     try {
+        const response = await fetch(`/api/boats/captain`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ boatId, captainId }),
+        });
+
+        if (response.ok) {
+            toast({ title: "Success", description: `Captain assigned successfully.` });
+            if (user) fetchOwnerData(user); // Refresh boats
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Update Failed", description: errorData.message || "Could not assign captain.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to assign captain", error);
+        toast({ title: "Error", description: "An unexpected error occurred while assigning captain.", variant: "destructive" });
+    }
+  }
 
   if (loading || authLoading) {
     return (
@@ -112,26 +262,20 @@ export default function DashboardPage() {
     )
   }
 
+  const captainOptions = captains.map(c => ({ value: c.uid, label: `${c.name} (${c.email})`}));
+
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
-       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center justify-between">
-            <Link href="/dashboard" className="flex items-center gap-2 font-bold">
-                <Ship className="h-6 w-6 text-primary" />
-                Boat Owner Dashboard
-            </Link>
-        </div>
-      </header>
+       <Header />
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Owner'}!</h1>
         <p className="text-muted-foreground mb-8">Manage your boats and bookings all in one place.</p>
         
         <Tabs defaultValue="bookings">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="bookings">Booking Requests</TabsTrigger>
-                <TabsTrigger value="boats">My Boats</TabsTrigger>
-                <TabsTrigger value="add_boat">Add New Boat</TabsTrigger>
+                <TabsTrigger value="boats">My Fleet</TabsTrigger>
             </TabsList>
 
             <TabsContent value="bookings" className="mt-6">
@@ -144,23 +288,28 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {mockBookings.map(booking => (
-                                <Card key={booking.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
+                            {bookings.length > 0 ? bookings.map(booking => (
+                                <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
                                     <div>
-                                        <p className="font-semibold">{booking.rider} booked <span className="text-primary">{booking.boat}</span></p>
-                                        <p className="text-sm text-muted-foreground">Scheduled for: {booking.date}</p>
+                                        <p className="font-semibold">{booking.rider?.name || 'A rider'} booked <span className="text-primary">{booking.boat?.name || 'a boat'}</span></p>
+                                        <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {booking.bookingType === 'seat' ? `${booking.seats} seat(s)` : 'Whole boat'}
+                                        </p>
                                     </div>
                                     <div className="flex items-center gap-2 self-end sm:self-center">
-                                         <Badge variant={booking.status === 'pending' ? 'default' : 'secondary'} className={booking.status === 'accepted' ? 'bg-green-500 text-white' : ''}>{booking.status}</Badge>
+                                         <Badge variant={booking.status === 'pending' ? 'default' : booking.status === 'accepted' ? 'secondary' : 'destructive'} >{booking.status}</Badge>
                                          {booking.status === 'pending' && (
                                             <>
-                                                <Button size="sm" variant="outline">Reject</Button>
-                                                <Button size="sm">Accept</Button>
+                                                <Button size="sm" variant="outline" onClick={() => handleBookingStatusChange(booking._id, 'rejected')}>Reject</Button>
+                                                <Button size="sm" onClick={() => handleBookingStatusChange(booking._id, 'accepted')}>Accept</Button>
                                             </>
                                          )}
                                     </div>
                                 </Card>
-                            ))}
+                            )) : (
+                                <p className="text-center text-muted-foreground py-4">You have no new booking requests.</p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -168,63 +317,82 @@ export default function DashboardPage() {
 
             <TabsContent value="boats" className="mt-6">
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Ship/>Your Fleet</CardTitle>
-                        <CardDescription>
-                            A list of your currently registered boats.
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                           <CardTitle className="flex items-center gap-2"><Ship/>Your Fleet</CardTitle>
+                           <CardDescription>A list of your currently registered boats. Assign captains here.</CardDescription>
+                        </div>
+                        <Dialog open={isAddBoatDialogOpen} onOpenChange={setAddBoatDialogOpen}>
+                            <DialogTrigger asChild>
+                                 <Button><PlusCircle/>Add New Boat</Button>
+                            </DialogTrigger>
+                             <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                <DialogTitle>Add New Boat</DialogTitle>
+                                <DialogDescription>
+                                    Fill in the details for the new boat. It will be added as 'Pending Validation'.
+                                </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handleAddBoat}>
+                                <div className="grid gap-4 py-4">
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="boat-name" className="text-right">Name</Label>
+                                        <Input id="boat-name" value={newBoatName} onChange={(e) => setNewBoatName(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                     <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="license" className="text-right">License #</Label>
+                                        <Input id="license" value={newBoatLicense} onChange={(e) => setNewBoatLicense(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="capacity" className="text-right">Capacity</Label>
+                                        <Input id="capacity" type="number" value={newBoatCapacity} onChange={(e) => setNewBoatCapacity(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="description" className="text-right">Description</Label>
+                                        <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} className="col-span-3" required/>
+                                    </div>
+                                </div>
+                                <CardFooter>
+                                    <Button type="submit" className="w-full">Save Boat</Button>
+                                </CardFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {mockBoats.map(boat => (
-                            <Card key={boat.id} className="p-4 flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold">{boat.name}</p>
-                                    <p className="text-sm text-muted-foreground">Capacity: {boat.capacity} riders</p>
+                         {boats.length > 0 ? boats.map(boat => (
+                            <Card key={boat._id} className="p-4 flex flex-col sm:flex-row justify-between items-start gap-4">
+                                <div className="flex-grow">
+                                    <p className="font-semibold">{boat.name} <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge></p>
+                                    <p className="text-sm text-muted-foreground">Capacity: {boat.capacity} riders | License: {boat.licenseNumber}</p>
+                                    <div className="mt-2 text-sm">
+                                        <span className="font-medium">Captain:</span> {
+                                            captains.find(c => c.uid === boat.captainId)?.name || <span className="text-muted-foreground italic">Not Assigned</span>
+                                        }
+                                    </div>
                                 </div>
-                                <Button variant="outline" size="sm">Edit</Button>
+                                <div className="w-full sm:w-64">
+                                  <Label className="text-xs text-muted-foreground">Assign Captain</Label>
+                                  <Combobox
+                                    options={captainOptions}
+                                    selectedValue={boat.captainId || ''}
+                                    onSelect={(captainId) => handleAssignCaptain(boat._id, captainId)}
+                                    placeholder="Select a captain..."
+                                    searchPlaceholder="Search captains..."
+                                    notFoundText="No captains found."
+                                  />
+                                </div>
                             </Card>
-                        ))}
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-            <TabsContent value="add_boat" className="mt-6">
-                <Card>
-                    <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><PlusCircle/>Add a New Boat</CardTitle>
-                    <CardDescription>
-                        Fill out the details below to list a new boat on the BlueRide platform.
-                    </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                    <form className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="boat-name">Boat Name</Label>
-                            <Input id="boat-name" placeholder="e.g., The Voyager" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="capacity">Passenger Capacity</Label>
-                            <Input id="capacity" type="number" placeholder="e.g., 10" />
-                        </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="boat-photos">Boat Photos</Label>
-                            <Input id="boat-photos" type="file" multiple />
-                             <p className="text-sm text-muted-foreground">Upload one or more clear photos of your boat.</p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" placeholder="Describe your boat, its features, and any rules for riders." />
-                        </div>
-                        <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                            Add Boat
-                        </Button>
-                    </form>
+                        )) : (
+                           <p className="text-center text-muted-foreground py-4">You have not added any boats yet.</p>
+                        )}
                     </CardContent>
                 </Card>
             </TabsContent>
         </Tabs>
-
       </main>
     </div>
   );
 }
+
+    

@@ -29,7 +29,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: 'Missing required fields: uid and role' }, { status: 400 });
     }
 
-    if (!['rider', 'boat_owner', 'admin'].includes(role)) {
+    if (!['rider', 'boat_owner', 'admin', 'captain'].includes(role)) {
         return NextResponse.json({ message: 'Invalid role specified' }, { status: 400 });
     }
 
@@ -52,3 +52,5 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+    

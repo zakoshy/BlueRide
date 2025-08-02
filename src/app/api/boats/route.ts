@@ -50,8 +50,8 @@ export async function POST(request: Request) {
     const boatsCollection = db.collection('boats');
     const usersCollection = db.collection('users');
 
-    // Verify the owner exists and is a boat owner
-    const owner = await usersCollection.findOne({ uid: ownerId, role: 'boat_owner' });
+    // Verify the owner exists and is a boat owner or admin
+    const owner = await usersCollection.findOne({ uid: ownerId, role: { $in: ['boat_owner', 'admin'] } });
     if (!owner) {
         return NextResponse.json({ message: 'Invalid owner or user is not a boat owner' }, { status: 403 });
     }
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       ownerId,
       licenseNumber,
       isValidated: false,
+      captainId: null, // Captain is not assigned on creation
       createdAt: new Date(),
     };
 
@@ -107,3 +108,5 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
   }
+
+    

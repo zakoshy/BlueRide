@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,7 +29,7 @@ interface ManagedUser {
   uid: string;
   name: string;
   email: string;
-  role: 'rider' | 'boat_owner' | 'admin';
+  role: 'rider' | 'boat_owner' | 'admin' | 'captain';
   createdAt: string;
 }
 
@@ -55,9 +55,11 @@ export default function AdminPage() {
   const [boats, setBoats] = useState<Boat[]>([]);
   const [isManageBoatsDialogOpen, setManageBoatsDialogOpen] = useState(false);
   const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
+  
   const [isPromoteUserDialogOpen, setPromoteUserDialogOpen] = useState(false);
   const [userToPromote, setUserToPromote] = useState('');
-  
+  const [roleToPromote, setRoleToPromote] = useState<'boat_owner' | 'captain'>('boat_owner');
+
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
   const [newBoatDescription, setNewBoatDescription] = useState('');
@@ -196,7 +198,7 @@ export default function AdminPage() {
         toast({ title: "Error", description: "Please select a user to promote.", variant: "destructive" });
         return;
     }
-    await handleRoleChange(userToPromote, 'boat_owner');
+    await handleRoleChange(userToPromote, roleToPromote);
     setUserToPromote('');
     setPromoteUserDialogOpen(false);
   }
@@ -328,35 +330,66 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
               <CardDescription>View all users and modify their roles. Boat owners can have their boats managed from here.</CardDescription>
             </div>
-             <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
-                <DialogTrigger asChild>
-                     <Button><UserPlus className="mr-2 h-4 w-4"/>Promote User</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Promote User to Boat Owner</DialogTitle>
-                        <DialogDescription>
-                            Select a user with the 'Rider' role to promote them to a 'Boat Owner'.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handlePromoteUser}>
-                        <div className="grid gap-4 py-4">
-                           <Label htmlFor="user-to-promote">Select Rider</Label>
-                           <Combobox
-                                options={riderOptions}
-                                selectedValue={userToPromote}
-                                onSelect={setUserToPromote}
-                                placeholder="Select a user to promote..."
-                                searchPlaceholder="Search riders by name or email..."
-                                notFoundText="No riders found."
-                            />
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit" disabled={!userToPromote}>Promote to Boat Owner</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-             </Dialog>
+             <div className="flex gap-2">
+                <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button onClick={() => setRoleToPromote('boat_owner')}><UserPlus className="mr-2 h-4 w-4"/>Promote to Owner</Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Promote Rider to Boat Owner</DialogTitle>
+                            <DialogDescription>
+                                Select a 'Rider' to promote them to a 'Boat Owner'.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handlePromoteUser}>
+                            <div className="grid gap-4 py-4">
+                               <Label htmlFor="user-to-promote">Select Rider</Label>
+                               <Combobox
+                                    options={riderOptions}
+                                    selectedValue={userToPromote}
+                                    onSelect={setUserToPromote}
+                                    placeholder="Select a user to promote..."
+                                    searchPlaceholder="Search riders..."
+                                    notFoundText="No riders found."
+                                />
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={!userToPromote}>Promote to Boat Owner</Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+                 <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="secondary" onClick={() => setRoleToPromote('captain')}><Anchor className="mr-2 h-4 w-4"/>Promote to Captain</Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Promote Rider to Captain</DialogTitle>
+                            <DialogDescription>
+                                Select a 'Rider' to promote them to a 'Captain'.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handlePromoteUser}>
+                            <div className="grid gap-4 py-4">
+                               <Label htmlFor="user-to-promote-captain">Select Rider</Label>
+                               <Combobox
+                                    options={riderOptions}
+                                    selectedValue={userToPromote}
+                                    onSelect={setUserToPromote}
+                                    placeholder="Select a user to promote..."
+                                    searchPlaceholder="Search riders..."
+                                    notFoundText="No riders found."
+                                />
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={!userToPromote}>Promote to Captain</Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                 </Dialog>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -375,7 +408,7 @@ export default function AdminPage() {
                     <TableCell className="font-medium">{u.name}</TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
                     <TableCell>
-                      <Badge variant={u.role === 'admin' ? 'destructive' : u.role === 'boat_owner' ? 'default' : 'secondary'}>{u.role}</Badge>
+                      <Badge variant={u.role === 'admin' ? 'destructive' : u.role === 'boat_owner' ? 'default' : u.role === 'captain' ? 'secondary' : 'outline'}>{u.role}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
@@ -488,3 +521,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
