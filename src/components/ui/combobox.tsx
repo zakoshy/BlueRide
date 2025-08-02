@@ -63,9 +63,12 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value}
+                  value={option.label} // Allow searching by label
                   onSelect={(currentValue) => {
-                    onSelect(currentValue === selectedValue ? "" : currentValue)
+                    const selectedOption = options.find(opt => opt.label.toLowerCase() === currentValue);
+                    if (selectedOption) {
+                      onSelect(selectedOption.value === selectedValue ? "" : selectedOption.value)
+                    }
                     setOpen(false)
                   }}
                 >
@@ -85,3 +88,5 @@ export function Combobox({
     </Popover>
   )
 }
+
+    

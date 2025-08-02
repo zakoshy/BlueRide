@@ -336,8 +336,8 @@ export default function AdminPage() {
                                 selectedValue={userToPromote}
                                 onSelect={setUserToPromote}
                                 placeholder="Select a user to promote..."
-                                searchPlaceholder="Search riders..."
-                                notFoundText="No riders available."
+                                searchPlaceholder="Search riders by name or email..."
+                                notFoundText="No riders found."
                             />
                         </div>
                         <DialogFooter>
@@ -477,3 +477,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
