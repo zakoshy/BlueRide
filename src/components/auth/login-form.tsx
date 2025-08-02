@@ -18,9 +18,8 @@ import { CardContent, CardFooter } from "@/components/ui/card"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { auth } from "@/lib/firebase/config"
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, signOut } from "firebase/auth"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from "firebase/auth"
 import { useRouter } from "next/navigation"
-import { Separator } from "../ui/separator"
 import { Chrome, Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
@@ -37,31 +36,31 @@ export function LoginForm() {
   const { refetchProfile } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  })
 
   const handleSuccessfulLogin = async (user: User) => {
     try {
+        // Manually refetch the profile to get the latest user role
+        await refetchProfile();
         const response = await fetch(`/api/users/${user.uid}`);
+        
         let profile;
         if (response.ok) {
            profile = await response.json();
-        } else if (response.status === 404) {
-             console.error("User profile not found in DB, but exists in Auth.");
-             // The user is authenticated, but their profile isn't in our DB.
-             // This could be a sync issue. We will let them in, but they will have a default role.
-             // A better solution would be to create the profile here or flag for an admin.
-             toast({
-                title: "Profile Issue",
-                description: "We couldn't find your user profile details. Some features might be limited.",
-                variant: "destructive"
-             })
         } else {
-            // Another error occurred fetching the profile
-            toast({
+             console.error("Failed to fetch user profile after login, but login was successful.");
+             toast({
                 title: "Login Warning",
                 description: "Could not retrieve your user profile. Please try again later.",
                 variant: "destructive",
             });
-             // We don't sign them out here, because they did authenticate correctly.
         }
 
         toast({
