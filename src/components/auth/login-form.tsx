@@ -38,59 +38,55 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  })
-
   const handleSuccessfulLogin = async (user: User) => {
     try {
         const response = await fetch(`/api/users/${user.uid}`);
+        let profile;
         if (response.ok) {
-          const profile = await response.json();
-          // Profile exists, now we can redirect based on role
-          toast({
-            title: "Login Successful",
-            description: "Welcome back!",
-          });
-          
-          if (profile.role === 'admin') {
-            router.push('/admin');
-          } else if (profile.role === 'boat_owner') {
-            router.push('/dashboard');
-          }
-          else {
-            router.push('/profile');
-          }
+           profile = await response.json();
         } else if (response.status === 404) {
-            // User exists in Firebase, but not in our database.
-            // This is an inconsistent state, so we log them out.
-            toast({
-                title: "Login Failed",
-                description: "Your user profile could not be found. Please contact support.",
-                variant: "destructive",
-            });
-            await signOut(auth);
+             console.error("User profile not found in DB, but exists in Auth.");
+             // The user is authenticated, but their profile isn't in our DB.
+             // This could be a sync issue. We will let them in, but they will have a default role.
+             // A better solution would be to create the profile here or flag for an admin.
+             toast({
+                title: "Profile Issue",
+                description: "We couldn't find your user profile details. Some features might be limited.",
+                variant: "destructive"
+             })
         } else {
             // Another error occurred fetching the profile
             toast({
-                title: "Login Failed",
-                description: "Could not retrieve your user profile. Please try again.",
+                title: "Login Warning",
+                description: "Could not retrieve your user profile. Please try again later.",
                 variant: "destructive",
             });
-            await signOut(auth);
+             // We don't sign them out here, because they did authenticate correctly.
         }
+
+        toast({
+            title: "Login Successful",
+            description: "Welcome back!",
+        });
+
+        // Redirect based on role
+        if (profile?.role === 'admin') {
+            router.push('/admin');
+        } else if (profile?.role === 'boat_owner') {
+            router.push('/dashboard');
+        } else {
+            router.push('/profile');
+        }
+
     } catch (error) {
         console.error("Failed to fetch user profile for redirection", error);
         toast({
             title: "Error",
-            description: "An unexpected error occurred during login.",
+            description: "An unexpected error occurred after login. Redirecting to your profile.",
             variant: "destructive",
         });
-        await signOut(auth);
+        // Still redirect to a default page even if the fetch fails
+        router.push('/profile');
     } finally {
         setIsSubmitting(false);
     }
