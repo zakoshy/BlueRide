@@ -6,21 +6,28 @@ import { ObjectId } from 'mongodb';
 // This is a protected route. In a real app, you'd validate the admin's session
 // and ensure the ownerId matches the logged-in user if they are a boat_owner.
 
-// GET boats for a specific owner
+// GET boats 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const ownerId = searchParams.get('ownerId');
+    const isValidated = searchParams.get('validated');
 
-    if (!ownerId) {
-      return NextResponse.json({ message: 'Owner ID is required' }, { status: 400 });
+    let query: any = {};
+
+    if (ownerId) {
+      query.ownerId = ownerId;
+    }
+    
+    if (isValidated) {
+        query.isValidated = true;
     }
 
     const client = await clientPromise;
     const db = client.db();
     const boatsCollection = db.collection('boats');
 
-    const boats = await boatsCollection.find({ ownerId: ownerId }).sort({ createdAt: -1 }).toArray();
+    const boats = await boatsCollection.find(query).sort({ createdAt: -1 }).toArray();
 
     return NextResponse.json(boats, { status: 200 });
   } catch (error) {
