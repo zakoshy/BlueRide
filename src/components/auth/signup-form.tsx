@@ -78,9 +78,9 @@ export function SignupForm() {
       await saveUserToDb(result.user);
       toast({
         title: "Account Created",
-        description: "Welcome to BlueRide!",
+        description: "Welcome to BlueRide! Please log in to continue.",
       });
-      router.push('/profile');
+      router.push('/login');
     } catch (error: any) {
       toast({
         title: "Sign up Failed",
@@ -105,9 +105,9 @@ export function SignupForm() {
       
       toast({
         title: "Signup Successful",
-        description: "Your account has been created.",
+        description: "Your account has been created. Please log in to continue.",
       })
-      router.push('/profile');
+      router.push('/login');
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
        if (error.code === 'auth/email-already-in-use') {
