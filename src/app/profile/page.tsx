@@ -3,7 +3,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -79,10 +79,10 @@ export default function ProfilePage() {
     };
     fetchRoutes();
   }, [toast]);
-
-  const handleFindBoat = async () => {
-    if (!selectedRouteId) {
-      toast({ title: "Select a Route", description: "Please select a route to find a boat.", variant: "secondary" });
+  
+  const handleFindBoat = useCallback(async (routeId: string | null) => {
+    if (!routeId) {
+      setBoats([]);
       return;
     }
     setIsFinding(true);
@@ -105,7 +105,12 @@ export default function ProfilePage() {
     } finally {
       setIsFinding(false);
     }
-  };
+  }, [toast]);
+
+  const handleRouteSelection = (routeId: string) => {
+    setSelectedRouteId(routeId);
+    handleFindBoat(routeId);
+  }
 
   const handleBookingSubmit = async () => {
     if (!user || !selectedBoat || !selectedRouteId) {
@@ -181,10 +186,10 @@ export default function ProfilePage() {
               <CardTitle className="flex items-center gap-2"><Sailboat/> Find Your Ride</CardTitle>
               <CardDescription>Select your route to see available water taxis.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col sm:flex-row items-end gap-4">
+            <CardContent>
                 <div className="grid w-full gap-1.5">
                     <Label htmlFor="route">Select Your Route</Label>
-                    <Select onValueChange={setSelectedRouteId} value={selectedRouteId || undefined}>
+                    <Select onValueChange={handleRouteSelection} value={selectedRouteId || undefined}>
                         <SelectTrigger id="route">
                             <SelectValue placeholder="Select a pickup and destination..." />
                         </SelectTrigger>
@@ -203,40 +208,42 @@ export default function ProfilePage() {
                         </SelectContent>
                     </Select>
                 </div>
-              <Button size="lg" onClick={handleFindBoat} disabled={isFinding || !selectedRouteId}>
-                {isFinding ? 'Searching...' : 'Find a boat'}
-              </Button>
             </CardContent>
           </Card>
 
           {isFinding && (
             <div className="space-y-4">
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
+                <h2 className="text-2xl font-bold">Searching for available boats...</h2>
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                </div>
             </div>
           )}
 
-          {boats.length > 0 && (
+          {boats.length > 0 && selectedRouteId && (
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold">Available Boats for <span className="text-primary">{selectedRoute?.name}</span></h2>
                 <div className="grid gap-6 md:grid-cols-2">
                     {boats.map(boat => (
-                        <Card key={boat._id} className="flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
-                                <CardDescription>A reliable boat ready for your trip.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-grow">
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                    <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
-                                </div>
-                            </CardContent>
-                            <CardFooter>
-                                <DialogTrigger asChild>
-                                    <Button className="w-full" onClick={() => setSelectedBoat(boat)}>Book a trip</Button>
-                                </DialogTrigger>
-                            </CardFooter>
-                        </Card>
+                         <Dialog key={boat._id} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null) }}>
+                            <Card className="flex flex-col">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
+                                    <CardDescription>A reliable boat ready for your trip.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="flex-grow">
+                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                        <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <DialogTrigger asChild>
+                                        <Button className="w-full" onClick={() => setSelectedBoat(boat)}>Book a trip</Button>
+                                    </DialogTrigger>
+                                </CardFooter>
+                            </Card>
+                         </Dialog>
                     ))}
                 </div>
             </div>
