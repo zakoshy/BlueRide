@@ -11,7 +11,6 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -368,21 +367,7 @@ export default function AdminPage() {
                       <Badge variant={u.role === 'admin' ? 'destructive' : u.role === 'boat_owner' ? 'default' : 'secondary'}>{u.role}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                       <Select
-                          defaultValue={u.role}
-                          onValueChange={(newRole) => handleRoleChange(u.uid, newRole)}
-                          disabled={user ? u.uid === user.uid : false}
-                        >
-                          <SelectTrigger className="w-[130px] inline-flex">
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="rider">Rider</SelectItem>
-                            <SelectItem value="boat_owner">Boat Owner</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <TableCell className="text-right">
                         {u.role === 'boat_owner' && (
                             <Button variant="outline" size="sm" onClick={() => handleManageBoatsClick(u)}>
                                 <Ship className="mr-2 h-4 w-4"/>
