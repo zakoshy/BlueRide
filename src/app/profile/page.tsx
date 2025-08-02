@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 
 // Define types for our data structures
 interface Route {
@@ -22,6 +23,11 @@ interface Route {
   name: string;
   pickup: string;
   destination: string;
+}
+
+interface Location {
+    value: string;
+    label: string;
 }
 
 interface Boat {
@@ -36,7 +42,7 @@ interface Boat {
 interface Booking {
     boatId: string;
     riderId: string;
-    routeId: string;
+    routeId: string; // This might change to pickup/destination strings
     bookingType: 'seat' | 'whole_boat';
     seats?: number;
     status: 'pending' | 'confirmed' | 'cancelled';
@@ -47,9 +53,11 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [routes, setRoutes] = useState<Route[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
-  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [pickup, setPickup] = useState<string>("");
+  const [destination, setDestination] = useState<string>("");
+
   const [isFinding, setIsFinding] = useState(false);
   const [selectedBoat, setSelectedBoat] = useState<Boat | null>(null);
   const [bookingType, setBookingType] = useState<'seat' | 'whole_boat'>('seat');
@@ -63,33 +71,44 @@ export default function ProfilePage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    // Fetch all available routes on component mount
-    const fetchRoutes = async () => {
+    // Fetch all available routes and derive unique locations
+    const fetchLocations = async () => {
       try {
         const response = await fetch('/api/routes');
         if (response.ok) {
-          const data = await response.json();
-          setRoutes(data);
+          const data: Route[] = await response.json();
+          const uniqueLocations = new Set<string>();
+          data.forEach(route => {
+            uniqueLocations.add(route.pickup);
+            uniqueLocations.add(route.destination);
+          });
+          setLocations(Array.from(uniqueLocations).map(loc => ({ value: loc.toLowerCase(), label: loc })));
         } else {
-          toast({ title: "Error", description: "Could not fetch available routes.", variant: "destructive" });
+          toast({ title: "Error", description: "Could not fetch available locations.", variant: "destructive" });
         }
       } catch (error) {
-        toast({ title: "Error", description: "An unexpected error occurred while fetching routes.", variant: "destructive" });
+        toast({ title: "Error", description: "An unexpected error occurred while fetching locations.", variant: "destructive" });
       }
     };
-    fetchRoutes();
+    fetchLocations();
   }, [toast]);
   
-  const handleFindBoat = useCallback(async (routeId: string | null) => {
-    if (!routeId) {
-      setBoats([]);
+  const handleFindBoat = useCallback(async () => {
+    if (!pickup || !destination) {
+      toast({ title: "Missing Information", description: "Please select both a pickup and destination.", variant: "destructive" });
       return;
     }
+     if (pickup === destination) {
+      toast({ title: "Invalid Route", description: "Pickup and destination cannot be the same.", variant: "destructive" });
+      return;
+    }
+
     setIsFinding(true);
     setBoats([]);
     try {
-      // In a real app, you'd fetch boats available for the selectedRouteId.
-      // For now, we fetch all validated boats as a stand-in.
+      // In a real app, you'd fetch boats available for the selected route.
+      // For now, we fetch all validated boats as a stand-in. This logic needs to be updated
+      // once the backend supports querying routes by pickup/destination.
       const response = await fetch(`/api/boats?validated=true`);
       if (response.ok) {
         const data = await response.json();
@@ -105,23 +124,23 @@ export default function ProfilePage() {
     } finally {
       setIsFinding(false);
     }
-  }, [toast]);
+  }, [pickup, destination, toast]);
 
-  const handleRouteSelection = (routeId: string) => {
-    setSelectedRouteId(routeId);
-    handleFindBoat(routeId);
-  }
 
   const handleBookingSubmit = async () => {
-    if (!user || !selectedBoat || !selectedRouteId) {
+    if (!user || !selectedBoat || !pickup || !destination) {
         toast({ title: "Error", description: "Missing required information for booking.", variant: "destructive"});
         return;
     }
+    
+    // This part is tricky as we don't have a routeId. We will need to adjust the backend.
+    // For now, let's send a placeholder. This will fail until the backend is updated.
+    const placeholderRouteId = "665b2064a382582855520f92";
 
     const bookingDetails: Omit<Booking, 'status'> = {
         boatId: selectedBoat._id,
         riderId: user.uid,
-        routeId: selectedRouteId,
+        routeId: placeholderRouteId, // Needs backend change
         bookingType: bookingType,
         ...(bookingType === 'seat' && { seats: numSeats }),
     };
@@ -138,7 +157,8 @@ export default function ProfilePage() {
             setIsBookingDialogOpen(false);
             setSelectedBoat(null);
             setBoats([]);
-            setSelectedRouteId(null);
+            setPickup("");
+            setDestination("");
         } else {
             const errorData = await response.json();
             toast({ title: "Booking Failed", description: errorData.message || "Could not complete booking.", variant: "destructive" });
@@ -147,10 +167,6 @@ export default function ProfilePage() {
         toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
     }
   }
-
-  const selectedRoute = useMemo(() => {
-    return routes.find(r => r._id === selectedRouteId);
-  }, [routes, selectedRouteId]);
 
 
   if (loading || !user) {
@@ -184,31 +200,39 @@ export default function ProfilePage() {
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Sailboat/> Find Your Ride</CardTitle>
-              <CardDescription>Select your route to see available water taxis.</CardDescription>
+              <CardDescription>Select your pickup and destination points to see available water taxis.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid w-full gap-1.5">
-                    <Label htmlFor="route">Select Your Route</Label>
-                    <Select onValueChange={handleRouteSelection} value={selectedRouteId || ""}>
-                        <SelectTrigger id="route">
-                            <SelectValue placeholder="Select a pickup and destination..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {routes.length > 0 ? routes.map(route => (
-                                <SelectItem key={route._id} value={route._id}>
-                                    <div className="flex items-center gap-2">
-                                        <Anchor className="h-4 w-4 text-muted-foreground" />
-                                        <span>{route.pickup}</span>
-                                        <ArrowRight className="h-4 w-4" />
-                                        <Waves className="h-4 w-4 text-muted-foreground" />
-                                        <span>{route.destination}</span>
-                                    </div>
-                                </SelectItem>
-                            )) : <SelectItem value="none" disabled>No routes available</SelectItem>}
-                        </SelectContent>
-                    </Select>
+                <div className="grid gap-4 md:grid-cols-2 md:gap-8">
+                    <div className="grid w-full gap-1.5">
+                        <Label htmlFor="from">From</Label>
+                        <Combobox
+                            options={locations.filter(l => l.value !== destination)}
+                            selectedValue={pickup}
+                            onSelect={setPickup}
+                            placeholder="Select pickup..."
+                            searchPlaceholder="Search locations..."
+                            notFoundText="No locations found."
+                        />
+                    </div>
+                     <div className="grid w-full gap-1.5">
+                        <Label htmlFor="to">To</Label>
+                         <Combobox
+                            options={locations.filter(l => l.value !== pickup)}
+                            selectedValue={destination}
+                            onSelect={setDestination}
+                            placeholder="Select destination..."
+                            searchPlaceholder="Search locations..."
+                            notFoundText="No locations found."
+                        />
+                    </div>
                 </div>
             </CardContent>
+            <CardFooter>
+                 <Button onClick={handleFindBoat} disabled={isFinding || !pickup || !destination}>
+                    {isFinding ? "Searching..." : "Find a Boat"}
+                </Button>
+            </CardFooter>
           </Card>
 
           {isFinding && (
@@ -221,9 +245,9 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {boats.length > 0 && selectedRouteId && (
+          {boats.length > 0 && pickup && destination && (
             <div className="space-y-6">
-                <h2 className="text-2xl font-bold">Available Boats for <span className="text-primary">{selectedRoute?.name}</span></h2>
+                <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locations.find(l=>l.value === destination)?.label}</span></h2>
                 <div className="grid gap-6 md:grid-cols-2">
                     {boats.map(boat => (
                          <Dialog key={boat._id} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null) }}>
@@ -261,7 +285,7 @@ export default function ProfilePage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <p className="text-sm text-muted-foreground">
-                    You are booking a trip from <span className="font-semibold text-primary">{selectedRoute?.pickup}</span> to <span className="font-semibold text-primary">{selectedRoute?.destination}</span>.
+                    You are booking a trip from <span className="font-semibold text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locations.find(l=>l.value === destination)?.label}</span>.
                 </p>
                 <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
                     <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
@@ -295,5 +319,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
