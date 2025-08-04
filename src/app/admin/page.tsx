@@ -59,6 +59,8 @@ export default function AdminPage() {
   const [isPromoteUserDialogOpen, setPromoteUserDialogOpen] = useState(false);
   const [userToPromote, setUserToPromote] = useState('');
   const [roleToPromote, setRoleToPromote] = useState<'boat_owner' | 'captain'>('boat_owner');
+  const [isPromoteCaptainDialogOpen, setPromoteCaptainDialogOpen] = useState(false);
+
 
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
@@ -181,14 +183,17 @@ export default function AdminPage() {
 
       if (response.ok) {
         toast({ title: "Success", description: "User role updated successfully." });
-        fetchUsers();
+        fetchUsers(); // Refresh user list
+        return true;
       } else {
         const errorData = await response.json();
         toast({ title: "Update Failed", description: errorData.message || "Could not update user role.", variant: "destructive" });
+        return false;
       }
     } catch (error) {
         console.error("Failed to update user role", error);
         toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+        return false;
     }
   };
 
@@ -198,9 +203,15 @@ export default function AdminPage() {
         toast({ title: "Error", description: "Please select a user to promote.", variant: "destructive" });
         return;
     }
-    await handleRoleChange(userToPromote, roleToPromote);
-    setUserToPromote('');
-    setPromoteUserDialogOpen(false);
+    const success = await handleRoleChange(userToPromote, roleToPromote);
+    if (success) {
+      setUserToPromote('');
+      if (roleToPromote === 'boat_owner') {
+        setPromoteUserDialogOpen(false);
+      } else {
+        setPromoteCaptainDialogOpen(false);
+      }
+    }
   }
 
   const handleValidateBoat = async (boatId: string) => {
@@ -379,9 +390,9 @@ export default function AdminPage() {
                         </form>
                     </DialogContent>
                 </Dialog>
-                 <Dialog>
+                 <Dialog open={isPromoteCaptainDialogOpen} onOpenChange={setPromoteCaptainDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="secondary" onClick={() => { setUserToPromote(''); setRoleToPromote('captain'); }}><Anchor className="mr-2 h-4 w-4"/>Promote to Captain</Button>
+                        <Button variant="secondary" onClick={() => { setUserToPromote(''); setRoleToPromote('captain'); setPromoteCaptainDialogOpen(true); }}><Anchor className="mr-2 h-4 w-4"/>Promote to Captain</Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
@@ -390,7 +401,7 @@ export default function AdminPage() {
                                 Select a 'Rider' to promote them to a 'Captain'.
                             </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={(e) => { e.preventDefault(); handleRoleChange(userToPromote, 'captain'); }}>
+                        <form onSubmit={handlePromoteUser}>
                             <div className="grid gap-4 py-4">
                                <Label htmlFor="user-to-promote-captain">Select Rider</Label>
                                <Combobox
@@ -540,3 +551,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
