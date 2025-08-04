@@ -176,7 +176,7 @@ export default function ErpPage() {
                                             </CardHeader>
                                             <CardContent className="p-2 pb-0">
                                                 <div className="text-2xl font-bold">Ksh {totalPlatformFee.toLocaleString()}</div>
-                                                 <p className="text-xs text-muted-foreground">15% of total revenue</p>
+                                                 <p className="text-xs text-muted-foreground">20% of total revenue</p>
                                             </CardContent>
                                         </Card>
                                         <Card className="p-4">
