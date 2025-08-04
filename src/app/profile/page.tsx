@@ -18,6 +18,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReactToPrint } from 'react-to-print';
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 // Define types for our data structures
@@ -423,76 +424,78 @@ export default function ProfilePage() {
                 Confirm your trip details. The owner will confirm the final price and availability.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 py-4">
-                 <div className="space-y-4 rounded-lg border p-4">
-                     <p className="text-sm text-muted-foreground">
-                        You are booking a trip from <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === destination)?.label}</span>.
-                    </p>
-                    <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
-                        <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="seat">Book one or more seats</SelectItem>
-                            <SelectItem value="whole_boat">Book the whole boat</SelectItem>
-                        </SelectContent>
-                    </Select>
+            <ScrollArea className="max-h-[70vh] p-1">
+                <div className="grid gap-6 py-4 px-3">
+                    <div className="space-y-4 rounded-lg border p-4">
+                        <p className="text-sm text-muted-foreground">
+                            You are booking a trip from <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === destination)?.label}</span>.
+                        </p>
+                        <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
+                            <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="seat">Book one or more seats</SelectItem>
+                                <SelectItem value="whole_boat">Book the whole boat</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                    {bookingType === 'seat' && (
-                        <div className="grid gap-2">
-                            <Label htmlFor="seats">Number of Seats</Label>
-                            <Input 
-                                id="seats" 
-                                type="number" 
-                                value={numSeats}
-                                onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10)))}
-                                min="1"
-                                max={selectedBoat?.capacity}
-                            />
-                            <p className="text-xs text-muted-foreground">Max capacity: {selectedBoat?.capacity} seats.</p>
-                        </div>
-                    )}
-                 </div>
-                 <div className="space-y-2">
-                    <div className="flex justify-between items-center font-semibold text-lg">
-                        <span>Fare:</span>
-                        <span>Ksh {baseFare > 0 ? baseFare.toLocaleString() : <Skeleton className="h-6 w-20 inline-block"/>}</span>
+                        {bookingType === 'seat' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="seats">Number of Seats</Label>
+                                <Input 
+                                    id="seats" 
+                                    type="number" 
+                                    value={numSeats}
+                                    onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10)))}
+                                    min="1"
+                                    max={selectedBoat?.capacity}
+                                />
+                                <p className="text-xs text-muted-foreground">Max capacity: {selectedBoat?.capacity} seats.</p>
+                            </div>
+                        )}
                     </div>
-                    <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
-                 </div>
-
-                 <Tabs defaultValue="card" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="card">Card</TabsTrigger>
-                      <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
-                      <TabsTrigger value="paypal">PayPal</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="card">
-                      <div className="space-y-4 rounded-md border bg-card p-4">
-                        <p className="text-center text-muted-foreground">Card payments are coming soon!</p>
-                         <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                            Send Booking Request
-                        </Button>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="mpesa">
-                       <div className="space-y-4 rounded-md border bg-card p-4">
-                          <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
-                          <Input id="mpesa-phone" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
-                           <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0 || !mpesaPhoneNumber}>
-                              Complete Payment
-                          </Button>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center font-semibold text-lg">
+                            <span>Fare:</span>
+                            <span>Ksh {baseFare > 0 ? baseFare.toLocaleString() : <Skeleton className="h-6 w-20 inline-block"/>}</span>
                         </div>
-                    </TabsContent>
-                     <TabsContent value="paypal">
-                       <div className="space-y-4 rounded-md border bg-card p-4">
-                         <p className="text-center text-muted-foreground">PayPal payments are coming soon!</p>
-                           <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                              Send Booking Request
-                          </Button>
-                       </div>
-                    </TabsContent>
-                </Tabs>
+                        <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
+                    </div>
 
-            </div>
+                    <Tabs defaultValue="card" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="card">Card</TabsTrigger>
+                        <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
+                        <TabsTrigger value="paypal">PayPal</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="card">
+                        <div className="space-y-4 rounded-md border bg-card p-4">
+                            <p className="text-center text-muted-foreground">Card payments are coming soon!</p>
+                            <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                                Send Booking Request
+                            </Button>
+                        </div>
+                        </TabsContent>
+                        <TabsContent value="mpesa">
+                        <div className="space-y-4 rounded-md border bg-card p-4">
+                            <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
+                            <Input id="mpesa-phone" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
+                            <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0 || !mpesaPhoneNumber}>
+                                Complete Payment
+                            </Button>
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="paypal">
+                        <div className="space-y-4 rounded-md border bg-card p-4">
+                            <p className="text-center text-muted-foreground">PayPal payments are coming soon!</p>
+                            <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                                Send Booking Request
+                            </Button>
+                        </div>
+                        </TabsContent>
+                    </Tabs>
+
+                </div>
+            </ScrollArea>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setIsBookingDialogOpen(false)}>Cancel</Button>
             </DialogFooter>
@@ -545,5 +548,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
