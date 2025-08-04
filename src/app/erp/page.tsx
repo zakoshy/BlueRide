@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, DollarSign, BarChart, AlertCircle, Banknote, Ship, UserCheck } from "lucide-react";
+import { ArrowLeft, Shield, DollarSign, BarChart, AlertCircle, Banknote, Ship, UserCheck, BookOpen, UserSquare } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -25,6 +25,35 @@ interface TripFinancials {
     boatOwnerShare: number;
 }
 
+interface FleetBoat {
+    _id: string;
+    name: string;
+    capacity: number;
+    licenseNumber: string;
+    isValidated: boolean;
+    owner: { name: string; email: string };
+    captain: { name: string; email: string } | null;
+}
+
+interface CrewMember {
+    _id: string;
+    uid: string;
+    name: string;
+    email: string;
+    tripCount: number;
+    totalCommission: number;
+}
+
+interface Booking {
+    _id: string;
+    pickup: string;
+    destination: string;
+    status: string;
+    createdAt: string;
+    rider: { name: string };
+    boat: { name: string };
+}
+
 export default function ErpPage() {
     const { user, profile, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -32,35 +61,72 @@ export default function ErpPage() {
 
     const [loading, setLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
-    const [financials, setFinancials] = useState<TripFinancials[]>([]);
     
+    // Financials State
+    const [financials, setFinancials] = useState<TripFinancials[]>([]);
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [totalPlatformFee, setTotalPlatformFee] = useState(0);
     const [totalPayouts, setTotalPayouts] = useState(0);
 
+    // Fleet State
+    const [fleet, setFleet] = useState<FleetBoat[]>([]);
 
-    const fetchFinancials = useCallback(async () => {
+    // Crew State
+    const [crew, setCrew] = useState<CrewMember[]>([]);
+
+    // Bookings State
+    const [bookings, setBookings] = useState<Booking[]>([]);
+
+
+    const fetchData = useCallback(async () => {
+        setLoading(true);
         try {
-            const response = await fetch('/api/erp/trip-financials');
-            if (response.ok) {
-                const data = await response.json();
+            const [financialsRes, fleetRes, crewRes, bookingsRes] = await Promise.all([
+                fetch('/api/erp/trip-financials'),
+                fetch('/api/erp/fleet'),
+                fetch('/api/erp/crew'),
+                fetch('/api/erp/bookings')
+            ]);
+
+            if (financialsRes.ok) {
+                const data = await financialsRes.json();
                 setFinancials(data);
-                
-                // Calculate totals
                 const revenue = data.reduce((acc: number, item: TripFinancials) => acc + item.totalFare, 0);
                 const platformFee = data.reduce((acc: number, item: TripFinancials) => acc + item.platformFee, 0);
                 const payouts = data.reduce((acc: number, item: TripFinancials) => acc + item.boatOwnerShare + item.captainCommission, 0);
-                
                 setTotalRevenue(revenue);
                 setTotalPlatformFee(platformFee);
                 setTotalPayouts(payouts);
-
             } else {
-                toast({ title: "Error", description: "Failed to fetch financial data.", variant: "destructive" });
+                 toast({ title: "Error", description: "Failed to fetch financial data.", variant: "destructive" });
             }
+
+            if(fleetRes.ok) {
+                const data = await fleetRes.json();
+                setFleet(data);
+            } else {
+                 toast({ title: "Error", description: "Failed to fetch fleet data.", variant: "destructive" });
+            }
+            
+            if(crewRes.ok) {
+                const data = await crewRes.json();
+                setCrew(data);
+            } else {
+                toast({ title: "Error", description: "Failed to fetch crew data.", variant: "destructive" });
+            }
+
+             if(bookingsRes.ok) {
+                const data = await bookingsRes.json();
+                setBookings(data);
+            } else {
+                toast({ title: "Error", description: "Failed to fetch bookings data.", variant: "destructive" });
+            }
+
         } catch (error) {
-            console.error("Failed to fetch financials", error);
-            toast({ title: "Error", description: "An unexpected error occurred while fetching financial data.", variant: "destructive" });
+            console.error("Failed to fetch ERP data", error);
+            toast({ title: "Error", description: "An unexpected error occurred while fetching dashboard data.", variant: "destructive" });
+        } finally {
+            setLoading(false);
         }
     }, [toast]);
 
@@ -72,12 +138,11 @@ export default function ErpPage() {
         }
         if (profile?.role === 'admin') {
             setIsAdmin(true);
-            fetchFinancials();
+            fetchData();
         } else {
             router.push('/profile');
         }
-        setLoading(false);
-    }, [user, profile, authLoading, router, fetchFinancials]);
+    }, [user, profile, authLoading, router, fetchData]);
 
      if (loading || authLoading) {
         return (
@@ -122,6 +187,9 @@ export default function ErpPage() {
         );
     }
     
+    const pendingBookings = bookings.filter(b => b.status === 'pending').length;
+    const completedTrips = bookings.filter(b => b.status === 'completed').length;
+
 
     return (
         <div className="min-h-dvh w-full bg-secondary/50">
@@ -146,9 +214,9 @@ export default function ErpPage() {
                 <Tabs defaultValue="financials">
                     <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                         <TabsTrigger value="financials">Financials</TabsTrigger>
-                        <TabsTrigger value="fleet" disabled>Fleet</TabsTrigger>
-                        <TabsTrigger value="crew" disabled>Crew</TabsTrigger>
-                        <TabsTrigger value="bookings" disabled>Bookings</TabsTrigger>
+                        <TabsTrigger value="fleet">Fleet</TabsTrigger>
+                        <TabsTrigger value="crew">Crew</TabsTrigger>
+                        <TabsTrigger value="bookings">Bookings</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="financials" className="mt-6">
@@ -223,11 +291,140 @@ export default function ErpPage() {
                                             ))}
                                         </TableBody>
                                     </Table>
-                                     {financials.length === 0 && (
+                                     {financials.length === 0 && !loading && (
                                         <p className="text-center text-muted-foreground py-8">No financial data available. Complete a trip to see data here.</p>
                                     )}
                                 </CardContent>
                              </Card>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="fleet" className="mt-6">
+                         <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Ship/>Fleet Overview</CardTitle>
+                                <CardDescription>Manage and monitor all boats registered on the platform.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                               <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Boat Name</TableHead>
+                                            <TableHead>Owner</TableHead>
+                                            <TableHead>Assigned Captain</TableHead>
+                                            <TableHead>License #</TableHead>
+                                            <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {fleet.map(boat => (
+                                            <TableRow key={boat._id}>
+                                                <TableCell className="font-medium">{boat.name}</TableCell>
+                                                <TableCell>{boat.owner.name} <span className="text-muted-foreground text-xs">({boat.owner.email})</span></TableCell>
+                                                <TableCell>{boat.captain ? `${boat.captain.name}` : <span className="text-muted-foreground italic">None</span>}</TableCell>
+                                                <TableCell className="font-mono text-xs">{boat.licenseNumber}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                {fleet.length === 0 && !loading && (
+                                    <p className="text-center text-muted-foreground py-8">No boats have been registered yet.</p>
+                                )}
+                            </CardContent>
+                         </Card>
+                    </TabsContent>
+                     <TabsContent value="crew" className="mt-6">
+                         <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><UserSquare/>Crew Performance</CardTitle>
+                                <CardDescription>Track captain performance and earnings.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                               <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Captain Name</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead>Trips Completed</TableHead>
+                                            <TableHead className="text-right">Total Commission Earned</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {crew.map(member => (
+                                            <TableRow key={member._id}>
+                                                <TableCell className="font-medium">{member.name}</TableCell>
+                                                <TableCell>{member.email}</TableCell>
+                                                <TableCell>{member.tripCount}</TableCell>
+                                                <TableCell className="text-right font-semibold text-green-600">Ksh {member.totalCommission.toLocaleString()}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                 {crew.length === 0 && !loading && (
+                                    <p className="text-center text-muted-foreground py-8">No captains have completed trips yet.</p>
+                                )}
+                            </CardContent>
+                         </Card>
+                    </TabsContent>
+                     <TabsContent value="bookings" className="mt-6">
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2"><BookOpen/>Booking Overview</CardTitle>
+                                    <CardDescription>A high-level summary of all booking activity.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        <Card className="p-4">
+                                            <CardHeader className="p-2 pt-0"><CardTitle className="text-sm font-medium">Total Bookings</CardTitle></CardHeader>
+                                            <CardContent className="p-2 pb-0"><div className="text-2xl font-bold">{bookings.length}</div></CardContent>
+                                        </Card>
+                                         <Card className="p-4">
+                                            <CardHeader className="p-2 pt-0"><CardTitle className="text-sm font-medium">Pending Confirmation</CardTitle></CardHeader>
+                                            <CardContent className="p-2 pb-0"><div className="text-2xl font-bold">{pendingBookings}</div></CardContent>
+                                        </Card>
+                                         <Card className="p-4">
+                                            <CardHeader className="p-2 pt-0"><CardTitle className="text-sm font-medium">Completed Trips</CardTitle></CardHeader>
+                                            <CardContent className="p-2 pb-0"><div className="text-2xl font-bold">{completedTrips}</div></CardContent>
+                                        </Card>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>All Bookings</CardTitle>
+                                    <CardDescription>A detailed log of all bookings made on the platform.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Rider</TableHead>
+                                                <TableHead>Boat</TableHead>
+                                                <TableHead>Route</TableHead>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {bookings.map(booking => (
+                                                <TableRow key={booking._id}>
+                                                    <TableCell>{booking.rider?.name || "N/A"}</TableCell>
+                                                    <TableCell>{booking.boat?.name || "N/A"}</TableCell>
+                                                    <TableCell className="text-xs">{booking.pickup} to {booking.destination}</TableCell>
+                                                    <TableCell>{new Date(booking.createdAt).toLocaleDateString()}</TableCell>
+                                                    <TableCell><Badge variant={booking.status === 'completed' ? 'default' : booking.status === 'pending' ? 'secondary' : 'destructive'}>{booking.status}</Badge></TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                     {bookings.length === 0 && !loading && (
+                                        <p className="text-center text-muted-foreground py-8">No bookings have been made yet.</p>
+                                    )}
+                                </CardContent>
+                            </Card>
                         </div>
                     </TabsContent>
                 </Tabs>
