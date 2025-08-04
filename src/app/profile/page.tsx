@@ -224,14 +224,11 @@ export default function ProfilePage() {
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
+    // Use a short timeout to allow React to render the component before printing
+    setTimeout(() => {
+        handlePrint();
+    }, 100);
   };
-  
-   useEffect(() => {
-    if (receiptData) {
-      handlePrint();
-    }
-  }, [receiptData, handlePrint]);
-
 
   if (loading || !user) {
     return (
