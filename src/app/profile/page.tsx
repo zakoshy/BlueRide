@@ -26,6 +26,8 @@ interface Location {
   name: string;
   county: string;
   area: string;
+  lat: number;
+  lng: number;
 }
 
 interface ComboboxOption {
@@ -40,16 +42,19 @@ interface Boat {
   licenseNumber: string;
   ownerId: string;
   isValidated: boolean;
+  type: 'standard' | 'luxury' | 'speed';
 }
 
 interface Booking {
   _id: string;
   pickup: string;
   destination: string;
-  status: 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'rejected' | 'cancelled';
   createdAt: string;
   bookingType: 'seat' | 'whole_boat';
   seats?: number;
+  baseFare: number;
+  finalFare?: number;
   boat?: { name: string };
 }
 
@@ -58,7 +63,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [locations, setLocations] = useState<ComboboxOption[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locationOptions, setLocationOptions] = useState<ComboboxOption[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
   const [pickup, setPickup] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
@@ -68,8 +74,7 @@ export default function ProfilePage() {
   const [bookingType, setBookingType] = useState<'seat' | 'whole_boat'>('seat');
   const [numSeats, setNumSeats] = useState(1);
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
-  const [fare, setFare] = useState(0);
-  const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState("");
+  const [baseFare, setBaseFare] = useState(0);
 
   // Bookings History
   const [userBookings, setUserBookings] = useState<Booking[]>([]);
@@ -114,7 +119,8 @@ export default function ProfilePage() {
         const response = await fetch('/api/routes');
         if (response.ok) {
           const data: Location[] = await response.json();
-          setLocations(data.map(loc => ({ value: loc.name.toLowerCase(), label: `${loc.name} (${loc.area})` })));
+          setLocations(data);
+          setLocationOptions(data.map(loc => ({ value: loc.name, label: `${loc.name} (${loc.area})` })));
         } else {
           toast({ title: "Error", description: "Could not fetch available locations.", variant: "destructive" });
         }
@@ -165,19 +171,14 @@ export default function ProfilePage() {
         return;
     }
     
-    // Simulate payment success before creating booking
-     toast({
-        title: "Payment Successful!",
-        description: `Your payment of Ksh ${fare.toLocaleString()} has been processed.`,
-    });
-    
     const bookingDetails = {
         boatId: selectedBoat._id,
         riderId: user.uid,
-        pickup: locations.find(l => l.value === pickup)?.label,
-        destination: locations.find(l => l.value === destination)?.label,
+        pickup: locationOptions.find(l => l.value === pickup)?.label,
+        destination: locationOptions.find(l => l.value === destination)?.label,
         bookingType: bookingType,
         ...(bookingType === 'seat' && { seats: numSeats }),
+        baseFare: baseFare,
     };
 
      try {
@@ -188,7 +189,7 @@ export default function ProfilePage() {
         });
 
         if (response.ok) {
-            toast({ title: "Booking Confirmed!", description: "Your trip is confirmed. You can view your receipt in the 'My Bookings' tab." });
+            toast({ title: "Booking Request Sent!", description: "Your request has been sent to the boat owner. You'll be notified upon confirmation." });
             setIsBookingDialogOpen(false);
             setSelectedBoat(null);
             setBoats([]);
@@ -204,17 +205,27 @@ export default function ProfilePage() {
     }
   }
   
-  const calculateFare = useCallback(() => {
-    const calculatedFare = bookingType === 'whole_boat' ? 2000 : numSeats * 150;
-    setFare(calculatedFare);
-  }, [bookingType, numSeats]);
+  const calculateFare = useCallback(async (boatType: string) => {
+    if (!pickup || !destination) return 0;
+    try {
+        const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}&boatType=${boatType}`);
+        if(response.ok) {
+            const data = await response.json();
+            setBaseFare(data.fare);
+        } else {
+            setBaseFare(0);
+        }
+    } catch {
+        setBaseFare(0);
+    }
+  }, [pickup, destination]);
 
 
   useEffect(() => {
-    if (isBookingDialogOpen) {
-      calculateFare();
+    if (isBookingDialogOpen && selectedBoat) {
+      calculateFare(selectedBoat.type);
     }
-  }, [isBookingDialogOpen, bookingType, numSeats, calculateFare]);
+  }, [isBookingDialogOpen, selectedBoat, calculateFare]);
 
 
   const handleOpenBookingDialog = (boat: Boat) => {
@@ -224,7 +235,6 @@ export default function ProfilePage() {
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
-    // Use a short timeout to allow React to render the component before printing
     setTimeout(() => {
         handlePrint();
     }, 100);
@@ -248,6 +258,15 @@ export default function ProfilePage() {
   }
   
   const paidBookings = userBookings.filter(b => b.status === 'confirmed' || b.status === 'completed');
+  const statusVariant = (status: Booking['status']) => {
+    switch (status) {
+        case 'confirmed': return 'default';
+        case 'completed': return 'secondary';
+        case 'rejected': return 'destructive';
+        default: return 'outline';
+    }
+  };
+
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -277,7 +296,7 @@ export default function ProfilePage() {
                             <div className="grid w-full gap-1.5">
                                 <Label htmlFor="from">From</Label>
                                 <Combobox
-                                    options={locations.filter(l => l.value !== destination)}
+                                    options={locationOptions.filter(l => l.value !== destination)}
                                     selectedValue={pickup}
                                     onSelect={setPickup}
                                     placeholder="Select pickup..."
@@ -288,7 +307,7 @@ export default function ProfilePage() {
                             <div className="grid w-full gap-1.5">
                                 <Label htmlFor="to">To</Label>
                                 <Combobox
-                                    options={locations.filter(l => l.value !== pickup)}
+                                    options={locationOptions.filter(l => l.value !== pickup)}
                                     selectedValue={destination}
                                     onSelect={setDestination}
                                     placeholder="Select destination..."
@@ -317,13 +336,13 @@ export default function ProfilePage() {
 
                 {boats.length > 0 && pickup && destination && (
                     <div className="space-y-6 mt-8">
-                        <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locations.find(l=>l.value === destination)?.label}</span></h2>
+                        <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locationOptions.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locationOptions.find(l=>l.value === destination)?.label}</span></h2>
                         <div className="grid gap-6 md:grid-cols-2">
                             {boats.map(boat => (
                                 <Card key={boat._id} className="flex flex-col cursor-pointer hover:border-primary transition-colors">
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
-                                        <CardDescription>A reliable boat ready for your trip.</CardDescription>
+                                        <CardDescription>A reliable <span className="font-bold capitalize">{boat.type}</span> boat ready for your trip.</CardDescription>
                                     </CardHeader>
                                     <CardContent className="flex-grow">
                                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -331,7 +350,7 @@ export default function ProfilePage() {
                                         </div>
                                     </CardContent>
                                     <CardFooter>
-                                        <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>Book a trip</Button>
+                                        <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>Request a trip</Button>
                                     </CardFooter>
                                 </Card>
                             ))}
@@ -352,20 +371,23 @@ export default function ProfilePage() {
                                <Skeleton className="h-16 w-full" />
                                <Skeleton className="h-16 w-full" />
                            </div>
-                        ) : paidBookings.length > 0 ? (
+                        ) : userBookings.length > 0 ? (
                             <div className="space-y-4">
-                                {paidBookings.map(booking => (
+                                {userBookings.map(booking => (
                                     <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
                                         <div>
                                             <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
                                             <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
                                             <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
+                                            {booking.finalFare && <p className="text-xs font-bold">Fare: Ksh {booking.finalFare.toLocaleString()}</p>}
                                         </div>
                                          <div className="flex items-center gap-2 self-end sm:self-center">
-                                            <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>{booking.status}</Badge>
-                                             <Button variant="outline" size="sm" onClick={() => handleViewReceipt(booking)}>
-                                                 <Printer className="mr-2 h-4 w-4"/> View Receipt
-                                             </Button>
+                                            <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
+                                             {(booking.status === 'confirmed' || booking.status === 'completed') && (
+                                                <Button variant="outline" size="sm" onClick={() => handleViewReceipt(booking)}>
+                                                    <Printer className="mr-2 h-4 w-4"/> View Receipt
+                                                </Button>
+                                             )}
                                          </div>
                                     </Card>
                                 ))}
@@ -388,15 +410,15 @@ export default function ProfilePage() {
        <Dialog open={isBookingDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null); setIsBookingDialogOpen(isOpen); }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Book Your Trip on {selectedBoat?.name}</DialogTitle>
+              <DialogTitle>Request a Trip on {selectedBoat?.name}</DialogTitle>
               <DialogDescription>
-                Confirm your booking details and complete payment to reserve your ride.
+                Confirm your trip details. The owner will confirm the final price and availability.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-6 py-4">
                  <div className="space-y-4 rounded-lg border p-4">
                      <p className="text-sm text-muted-foreground">
-                        You are booking a trip from <span className="font-semibold text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locations.find(l=>l.value === destination)?.label}</span>.
+                        You are booking a trip from <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === destination)?.label}</span>.
                     </p>
                     <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
                         <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
@@ -421,66 +443,19 @@ export default function ProfilePage() {
                         </div>
                     )}
                  </div>
-
-                 <div className="space-y-4">
+                 <div className="space-y-2">
                     <div className="flex justify-between items-center font-semibold text-lg">
-                        <span>Total Fare:</span>
-                        <span>Ksh {fare.toLocaleString()}</span>
+                        <span>Estimated Fare:</span>
+                        <span>Ksh {baseFare > 0 ? baseFare.toLocaleString() : <Skeleton className="h-6 w-20 inline-block"/>}</span>
                     </div>
-
-                    <Tabs defaultValue="mpesa" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
-                            <TabsTrigger value="card">Card</TabsTrigger>
-                            <TabsTrigger value="paypal">PayPal</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="mpesa" className="mt-4">
-                             <Card className="p-4 space-y-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="phone-number">M-Pesa Phone Number</Label>
-                                  <Input id="phone-number" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
-                               </div>
-                               <Button onClick={handleBookingSubmit} className="w-full" disabled={!mpesaPhoneNumber}>
-                                    Complete Payment
-                                </Button>
-                                <p className="text-xs text-center text-muted-foreground">An STK push will be sent to this number.</p>
-                            </Card>
-                        </TabsContent>
-                         <TabsContent value="card" className="mt-4">
-                             <Card className="p-4 space-y-4">
-                               <div className="space-y-2">
-                                 <Label htmlFor="card-number">Card Number</Label>
-                                 <Input id="card-number" placeholder="•••• •••• •••• ••••" />
-                               </div>
-                               <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="expiry">Expiry</Label>
-                                    <Input id="expiry" placeholder="MM/YY" />
-                                </div>
-                                 <div className="space-y-2">
-                                    <Label htmlFor="cvc">CVC</Label>
-                                    <Input id="cvc" placeholder="•••" />
-                                </div>
-                               </div>
-                               <Button onClick={handleBookingSubmit} className="w-full">
-                                    Pay Ksh {fare.toLocaleString()}
-                                </Button>
-                             </Card>
-                        </TabsContent>
-                         <TabsContent value="paypal" className="mt-4">
-                             <Card className="p-4 text-center">
-                                 <p className="text-sm text-muted-foreground mb-4">You will be redirected to PayPal to complete your payment securely.</p>
-                                <Button onClick={handleBookingSubmit} variant="outline" className="w-full bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
-                                    <Radio className="mr-2"/> Continue with PayPal
-                                </Button>
-                             </Card>
-                        </TabsContent>
-                    </Tabs>
-
+                    <p className="text-xs text-muted-foreground text-center">Final fare will be confirmed by the boat owner.</p>
                  </div>
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setIsBookingDialogOpen(false)}>Cancel</Button>
+               <Button onClick={handleBookingSubmit} className="w-full sm:w-auto" disabled={baseFare <= 0}>
+                Send Booking Request
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -518,6 +493,7 @@ export default function ProfilePage() {
                             <div><strong className="font-medium text-gray-600">Type:</strong> {receiptData.bookingType === 'seat' ? 'Seat Booking' : 'Whole Boat Charter'}</div>
                             {receiptData.seats && <div><strong className="font-medium text-gray-600">Seats:</strong> {receiptData.seats}</div>}
                             <div><strong className="font-medium text-gray-600">Status:</strong> <span className="font-bold uppercase text-green-600">{receiptData.status}</span></div>
+                            {receiptData.finalFare && <div><strong className="font-medium text-gray-600">Final Fare:</strong> <span className="font-bold">Ksh {receiptData.finalFare.toLocaleString()}</span></div>}
                         </div>
                     </div>
                     <div className="text-center mt-10 border-t-2 border-dashed pt-6">

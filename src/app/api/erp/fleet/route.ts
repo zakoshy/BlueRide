@@ -40,6 +40,7 @@ export async function GET(request: Request) {
                 capacity: 1,
                 licenseNumber: 1,
                 isValidated: 1,
+                type: 1,
                 owner: {
                     name: "$ownerInfo.name",
                     email: "$ownerInfo.email"

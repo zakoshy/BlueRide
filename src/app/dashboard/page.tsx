@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,16 +21,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Combobox } from "@/components/ui/combobox";
 import type { User as FirebaseUser } from "firebase/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-
-interface UserProfile {
-  _id: string;
-  uid: string;
-  name: string;
-  email: string;
-  role: 'rider' | 'boat_owner' | 'admin' | 'captain';
-  createdAt: string;
-}
 
 interface Boat {
     _id: string;
@@ -41,6 +34,7 @@ interface Boat {
     isValidated: boolean;
     ownerId: string;
     captainId?: string;
+    type: 'standard' | 'luxury' | 'speed';
 }
 
 interface Booking {
@@ -55,6 +49,9 @@ interface Booking {
     createdAt: string;
     rider?: { name: string };
     boat?: { name: string };
+    baseFare: number;
+    finalFare?: number;
+    adjustmentPercent?: number;
 }
 
 interface Captain {
@@ -62,6 +59,8 @@ interface Captain {
     name: string;
     email: string;
 }
+
+const MAX_ADJUSTMENT = 15; // 15%
 
 export default function DashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -74,12 +73,16 @@ export default function DashboardPage() {
   const [boats, setBoats] = useState<Boat[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [captains, setCaptains] = useState<Captain[]>([]);
+  
+  const [currentAdjustments, setCurrentAdjustments] = useState<Record<string, number>>({});
 
   const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
   const [newBoatDescription, setNewBoatDescription] = useState('');
   const [newBoatLicense, setNewBoatLicense] = useState('');
+  const [newBoatType, setNewBoatType] = useState<'standard' | 'luxury' | 'speed'>('standard');
+
 
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
     if (!currentUser) return;
@@ -104,6 +107,12 @@ export default function DashboardPage() {
         if (bookingsResponse.ok) {
             const bookingsData = await bookingsResponse.json();
             setBookings(bookingsData);
+            // Initialize adjustments state
+            const initialAdjustments: Record<string, number> = {};
+            bookingsData.forEach((b: Booking) => {
+                if(b.status === 'pending') initialAdjustments[b._id] = 0;
+            });
+            setCurrentAdjustments(initialAdjustments);
         } else {
             toast({ title: "Error", description: "Failed to fetch your bookings.", variant: "destructive" });
         }
@@ -157,7 +166,8 @@ export default function DashboardPage() {
                 capacity: parseInt(newBoatCapacity, 10),
                 description: newBoatDescription,
                 licenseNumber: newBoatLicense,
-                ownerId: user.uid
+                ownerId: user.uid,
+                type: newBoatType,
             }),
         });
 
@@ -199,6 +209,36 @@ export default function DashboardPage() {
         toast({ title: "Error", description: "An unexpected error occurred while assigning captain.", variant: "destructive" });
     }
   }
+
+  const handleBookingStatusUpdate = async (bookingId: string, status: 'accepted' | 'rejected', baseFare: number) => {
+    let payload: any = { bookingId, status };
+    if (status === 'accepted') {
+        const adjustmentPercent = currentAdjustments[bookingId] || 0;
+        const finalFare = baseFare * (1 + adjustmentPercent / 100);
+        payload = { ...payload, finalFare, adjustmentPercent };
+    }
+
+    try {
+        const response = await fetch('/api/bookings/status', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if(response.ok) {
+             toast({ title: "Success", description: `Booking has been ${status}.` });
+             if (user) fetchOwnerData(user);
+        } else {
+             const errorData = await response.json();
+             toast({ title: "Update Failed", description: errorData.message || "Could not update booking.", variant: "destructive" });
+        }
+
+    } catch (error) {
+         console.error("Failed to update booking status", error);
+         toast({ title: "Error", description: "An unexpected error occurred while updating booking.", variant: "destructive" });
+    }
+  };
+
 
   if (loading || authLoading) {
     return (
@@ -252,7 +292,10 @@ export default function DashboardPage() {
         default: return 'outline';
     }
   };
-
+  
+  const pendingBookings = bookings.filter(b => b.status === 'pending');
+  const confirmedBookings = bookings.filter(b => ['confirmed', 'completed', 'rejected'].includes(b.status));
+  const getFinalFare = (baseFare: number, adjustment: number) => baseFare * (1 + adjustment/100);
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -264,38 +307,85 @@ export default function DashboardPage() {
         
         <Tabs defaultValue="bookings">
             <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="bookings">All Bookings</TabsTrigger>
+                <TabsTrigger value="bookings">Bookings</TabsTrigger>
                 <TabsTrigger value="boats">My Fleet</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="bookings" className="mt-6">
+            <TabsContent value="bookings" className="mt-6 space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><BookOpen/>Pending Requests</CardTitle>
+                        <CardDescription>Accept or reject new booking requests. Adjust the final fare within a {MAX_ADJUSTMENT}% range.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         {pendingBookings.length > 0 ? (
+                           <div className="space-y-4">
+                                {pendingBookings.map(booking => (
+                                    <Card key={booking._id} className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                        <div className="col-span-1">
+                                             <p className="font-semibold">{booking.boat?.name || 'N/A'}</p>
+                                             <p className="text-sm text-muted-foreground">Rider: {booking.rider?.name || 'N/A'}</p>
+                                             <p className="text-xs">{booking.pickup} to {booking.destination}</p>
+                                             <p className="text-xs text-muted-foreground">{booking.bookingType === 'seat' ? `${booking.seats} seat(s)` : 'Whole boat'}</p>
+                                        </div>
+                                         <div className="col-span-1 space-y-2">
+                                            <Label>Fare Adjustment ({currentAdjustments[booking._id] || 0}%)</Label>
+                                            <div className="flex items-center gap-2">
+                                                <Minus className="h-4 w-4 text-muted-foreground"/>
+                                                <Slider
+                                                    min={-MAX_ADJUSTMENT}
+                                                    max={MAX_ADJUSTMENT}
+                                                    step={1}
+                                                    value={[currentAdjustments[booking._id] || 0]}
+                                                    onValueChange={(value) => setCurrentAdjustments(prev => ({ ...prev, [booking._id]: value[0] }))}
+                                                />
+                                                <Plus className="h-4 w-4 text-muted-foreground"/>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-xs text-muted-foreground">Base: Ksh {booking.baseFare.toLocaleString()}</p>
+                                                <p className="font-semibold">Final: Ksh {getFinalFare(booking.baseFare, currentAdjustments[booking._id] || 0).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="col-span-1 flex justify-end gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => handleBookingStatusUpdate(booking._id, 'rejected', booking.baseFare)}>Reject</Button>
+                                            <Button size="sm" onClick={() => handleBookingStatusUpdate(booking._id, 'accepted', booking.baseFare)}>Accept</Button>
+                                        </div>
+                                    </Card>
+                                ))}
+                           </div>
+                        ) : (
+                            <p className="text-center text-muted-foreground py-8">You have no pending booking requests.</p>
+                        )}
+                    </CardContent>
+                </Card>
+
                  <Card>
                     <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><BookOpen/>Confirmed Trips</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><BookOpen/>Booking History</CardTitle>
                     <CardDescription>
-                       This is a log of all confirmed bookings for your boats.
+                       This is a log of all your past bookings.
                     </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {bookings.length > 0 ? (
+                        {confirmedBookings.length > 0 ? (
                            <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Rider</TableHead>
                                         <TableHead>Boat</TableHead>
                                         <TableHead>Route</TableHead>
-                                        <TableHead>Trip Details</TableHead>
+                                        <TableHead>Final Fare</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead>Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {bookings.map(booking => (
+                                    {confirmedBookings.map(booking => (
                                         <TableRow key={booking._id}>
                                             <TableCell>{booking.rider?.name || 'N/A'}</TableCell>
                                             <TableCell>{booking.boat?.name || 'N/A'}</TableCell>
                                             <TableCell className="text-xs">{booking.pickup}<br/>to {booking.destination}</TableCell>
-                                            <TableCell className="text-sm">{booking.bookingType === 'seat' ? `${booking.seats} seat(s)` : 'Whole boat'}</TableCell>
+                                            <TableCell className="font-semibold">Ksh {booking.finalFare?.toLocaleString() || 'N/A'}</TableCell>
                                             <TableCell>{new Date(booking.createdAt).toLocaleDateString()}</TableCell>
                                             <TableCell><Badge variant={statusVariant(booking.status)}>{booking.status}</Badge></TableCell>
                                         </TableRow>
@@ -303,7 +393,7 @@ export default function DashboardPage() {
                                 </TableBody>
                            </Table>
                         ) : (
-                            <p className="text-center text-muted-foreground py-8">You have no bookings yet.</p>
+                            <p className="text-center text-muted-foreground py-8">You have no booking history yet.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -342,6 +432,19 @@ export default function DashboardPage() {
                                         <Input id="capacity" type="number" value={newBoatCapacity} onChange={(e) => setNewBoatCapacity(e.target.value)} className="col-span-3" required/>
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="boat-type" className="text-right">Type</Label>
+                                         <Select onValueChange={(value) => setNewBoatType(value as any)} defaultValue={newBoatType}>
+                                            <SelectTrigger className="col-span-3">
+                                                <SelectValue placeholder="Select boat type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="standard">Standard</SelectItem>
+                                                <SelectItem value="luxury">Luxury</SelectItem>
+                                                <SelectItem value="speed">Speed Boat</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
                                         <Label htmlFor="description" className="text-right">Description</Label>
                                         <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} className="col-span-3" required/>
                                     </div>
@@ -357,7 +460,7 @@ export default function DashboardPage() {
                          {boats.length > 0 ? boats.map(boat => (
                             <Card key={boat._id} className="p-4 flex flex-col sm:flex-row justify-between items-start gap-4">
                                 <div className="flex-grow">
-                                    <div className="font-semibold">{boat.name} <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge></div>
+                                    <div className="font-semibold flex items-center gap-2">{boat.name} <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge> <Badge variant="outline" className="capitalize">{boat.type}</Badge></div>
                                     <p className="text-sm text-muted-foreground">Capacity: {boat.capacity} riders | License: {boat.licenseNumber}</p>
                                     <div className="mt-2 text-sm">
                                         <span className="font-medium">Captain:</span> {

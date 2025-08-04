@@ -19,7 +19,9 @@ interface TripFinancials {
     _id: string;
     bookingId: string;
     tripCompletedAt: string;
-    totalFare: number;
+    baseFare: number;
+    finalFare: number;
+    adjustmentPercent: number;
     platformFee: number;
     captainCommission: number;
     boatOwnerShare: number;
@@ -31,6 +33,7 @@ interface FleetBoat {
     capacity: number;
     licenseNumber: string;
     isValidated: boolean;
+    type: string;
     owner: { name: string; email: string };
     captain: { name: string; email: string } | null;
 }
@@ -52,6 +55,7 @@ interface Booking {
     createdAt: string;
     rider: { name: string };
     boat: { name: string };
+    finalFare?: number;
 }
 
 export default function ErpPage() {
@@ -91,7 +95,7 @@ export default function ErpPage() {
             if (financialsRes.ok) {
                 const data = await financialsRes.json();
                 setFinancials(data);
-                const revenue = data.reduce((acc: number, item: TripFinancials) => acc + item.totalFare, 0);
+                const revenue = data.reduce((acc: number, item: TripFinancials) => acc + item.finalFare, 0);
                 const platformFee = data.reduce((acc: number, item: TripFinancials) => acc + item.platformFee, 0);
                 const payouts = data.reduce((acc: number, item: TripFinancials) => acc + item.boatOwnerShare + item.captainCommission, 0);
                 setTotalRevenue(revenue);
@@ -189,6 +193,15 @@ export default function ErpPage() {
     
     const pendingBookings = bookings.filter(b => b.status === 'pending').length;
     const completedTrips = bookings.filter(b => b.status === 'completed').length;
+    const statusVariant = (status: Booking['status']) => {
+        switch (status) {
+            case 'confirmed': return 'default';
+            case 'completed': return 'secondary';
+            case 'rejected': return 'destructive';
+            case 'pending': return 'outline';
+            default: return 'outline';
+        }
+    };
 
 
     return (
@@ -271,8 +284,9 @@ export default function ErpPage() {
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Booking ID</TableHead>
-                                                <TableHead>Completed On</TableHead>
-                                                <TableHead className="text-right">Total Fare</TableHead>
+                                                <TableHead>Base Fare</TableHead>
+                                                <TableHead>Adj. %</TableHead>
+                                                <TableHead className="text-right">Final Fare</TableHead>
                                                 <TableHead className="text-right">Platform Fee</TableHead>
                                                 <TableHead className="text-right">Captain Share</TableHead>
                                                 <TableHead className="text-right">Owner Share</TableHead>
@@ -282,8 +296,9 @@ export default function ErpPage() {
                                             {financials.map(item => (
                                                 <TableRow key={item._id}>
                                                     <TableCell className="font-mono text-xs">{item.bookingId}</TableCell>
-                                                    <TableCell>{new Date(item.tripCompletedAt).toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-semibold">Ksh {item.totalFare.toLocaleString()}</TableCell>
+                                                    <TableCell>Ksh {item.baseFare.toLocaleString()}</TableCell>
+                                                    <TableCell>{item.adjustmentPercent}%</TableCell>
+                                                    <TableCell className="text-right font-semibold">Ksh {item.finalFare.toLocaleString()}</TableCell>
                                                     <TableCell className="text-right text-red-600">Ksh {item.platformFee.toLocaleString()}</TableCell>
                                                     <TableCell className="text-right text-green-600">Ksh {item.captainCommission.toLocaleString()}</TableCell>
                                                     <TableCell className="text-right text-green-600">Ksh {item.boatOwnerShare.toLocaleString()}</TableCell>
@@ -312,6 +327,7 @@ export default function ErpPage() {
                                             <TableHead>Owner</TableHead>
                                             <TableHead>Assigned Captain</TableHead>
                                             <TableHead>License #</TableHead>
+                                            <TableHead>Type</TableHead>
                                             <TableHead>Status</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -322,6 +338,7 @@ export default function ErpPage() {
                                                 <TableCell>{boat.owner.name} <span className="text-muted-foreground text-xs">({boat.owner.email})</span></TableCell>
                                                 <TableCell>{boat.captain ? `${boat.captain.name}` : <span className="text-muted-foreground italic">None</span>}</TableCell>
                                                 <TableCell className="font-mono text-xs">{boat.licenseNumber}</TableCell>
+                                                <TableCell className="capitalize">{boat.type}</TableCell>
                                                 <TableCell>
                                                     <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge>
                                                 </TableCell>
@@ -403,7 +420,7 @@ export default function ErpPage() {
                                             <TableRow>
                                                 <TableHead>Rider</TableHead>
                                                 <TableHead>Boat</TableHead>
-                                                <TableHead>Route</TableHead>
+                                                <TableHead>Final Fare</TableHead>
                                                 <TableHead>Date</TableHead>
                                                 <TableHead>Status</TableHead>
                                             </TableRow>
@@ -413,9 +430,9 @@ export default function ErpPage() {
                                                 <TableRow key={booking._id}>
                                                     <TableCell>{booking.rider?.name || "N/A"}</TableCell>
                                                     <TableCell>{booking.boat?.name || "N/A"}</TableCell>
-                                                    <TableCell className="text-xs">{booking.pickup} to {booking.destination}</TableCell>
+                                                    <TableCell>Ksh {booking.finalFare?.toLocaleString() || 'N/A'}</TableCell>
                                                     <TableCell>{new Date(booking.createdAt).toLocaleDateString()}</TableCell>
-                                                    <TableCell><Badge variant={booking.status === 'completed' ? 'default' : booking.status === 'pending' ? 'secondary' : 'destructive'}>{booking.status}</Badge></TableCell>
+                                                    <TableCell><Badge variant={statusVariant(booking.status)}>{booking.status}</Badge></TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>

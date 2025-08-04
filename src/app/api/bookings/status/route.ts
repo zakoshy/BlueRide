@@ -10,11 +10,9 @@ const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
 const CAPTAIN_COMMISSION_PERCENTAGE = 0.10; // 10%
 
 async function createTripFinancials(booking: any) {
-    if (!booking) return;
+    if (!booking || !booking.finalFare) return;
 
-    // A simple fare calculation logic. This can be made more complex.
-    // e.g., base fare + per km/mile rate + per minute rate
-    const fare = booking.bookingType === 'whole_boat' ? 2000 : (booking.seats || 1) * 150;
+    const fare = booking.finalFare;
 
     const platformFee = fare * PLATFORM_FEE_PERCENTAGE;
     const captainCommission = (fare - platformFee) * CAPTAIN_COMMISSION_PERCENTAGE;
@@ -26,7 +24,9 @@ async function createTripFinancials(booking: any) {
         ownerId: booking.ownerId,
         captainId: booking.captainId,
         tripCompletedAt: new Date(),
-        totalFare: fare,
+        baseFare: booking.baseFare,
+        adjustmentPercent: booking.adjustmentPercent,
+        finalFare: booking.finalFare,
         platformFee: platformFee,
         captainCommission: captainCommission,
         boatOwnerShare: ownerShare,
@@ -46,7 +46,7 @@ async function createTripFinancials(booking: any) {
 
 export async function PUT(request: Request) {
     try {
-      const { bookingId, status } = await request.json();
+      const { bookingId, status, finalFare, adjustmentPercent } = await request.json();
   
       if (!bookingId || !status) {
         return NextResponse.json({ message: 'Missing required fields: bookingId and status' }, { status: 400 });
@@ -54,6 +54,10 @@ export async function PUT(request: Request) {
 
       if (!['accepted', 'rejected', 'completed'].includes(status)) {
         return NextResponse.json({ message: 'Invalid status provided. Must be "accepted", "rejected", or "completed".' }, { status: 400 });
+      }
+      
+      if (status === 'accepted' && (finalFare === undefined || adjustmentPercent === undefined)) {
+         return NextResponse.json({ message: 'Accepted bookings must have a finalFare and adjustmentPercent' }, { status: 400 });
       }
   
       if (!ObjectId.isValid(bookingId)) {
@@ -64,9 +68,17 @@ export async function PUT(request: Request) {
       const db = client.db();
       const bookingsCollection = db.collection('bookings');
   
+      const updateData: any = { status };
+      if (status === 'accepted') {
+        updateData.finalFare = finalFare;
+        updateData.adjustmentPercent = adjustmentPercent;
+        // Rider has paid, so we confirm the booking
+        updateData.status = 'confirmed';
+      }
+
       const result = await bookingsCollection.updateOne(
         { _id: new ObjectId(bookingId) },
-        { $set: { status: status } }
+        { $set: updateData }
       );
   
       if (result.matchedCount === 0) {

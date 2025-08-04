@@ -6,9 +6,9 @@ import { ObjectId } from 'mongodb';
 // POST a new booking
 export async function POST(request: Request) {
   try {
-    const { boatId, riderId, pickup, destination, bookingType, seats } = await request.json();
+    const { boatId, riderId, pickup, destination, bookingType, seats, baseFare } = await request.json();
 
-    if (!boatId || !riderId || !pickup || !destination || !bookingType) {
+    if (!boatId || !riderId || !pickup || !destination || !bookingType || !baseFare) {
       return NextResponse.json({ message: 'Missing required booking fields' }, { status: 400 });
     }
 
@@ -46,13 +46,16 @@ export async function POST(request: Request) {
       destination,
       bookingType,
       ...(seats && { seats }), // Conditionally add seats
-      status: 'confirmed', // Bookings are now confirmed instantly upon payment
+      baseFare,
+      finalFare: null,
+      adjustmentPercent: null,
+      status: 'pending', // Awaiting owner confirmation
       createdAt: new Date(),
     };
 
     const result = await bookingsCollection.insertOne(newBooking);
 
-    return NextResponse.json({ message: 'Booking created successfully', bookingId: result.insertedId }, { status: 201 });
+    return NextResponse.json({ message: 'Booking request sent successfully', bookingId: result.insertedId }, { status: 201 });
   } catch (error) {
     console.error('Error creating booking:', error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -92,6 +95,8 @@ export async function GET(request: Request) {
                     createdAt: 1,
                     bookingType: 1,
                     seats: 1,
+                    baseFare: 1,
+                    finalFare: 1,
                     boat: { name: '$boatInfo.name' }
                 }
             }

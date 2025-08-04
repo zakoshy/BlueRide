@@ -39,10 +39,10 @@ export async function GET(request: Request) {
 // POST a new boat
 export async function POST(request: Request) {
   try {
-    const { name, capacity, description, ownerId, licenseNumber } = await request.json();
+    const { name, capacity, description, ownerId, licenseNumber, type } = await request.json();
 
-    if (!name || !capacity || !ownerId || !licenseNumber) {
-      return NextResponse.json({ message: 'Missing required fields: name, capacity, ownerId, and licenseNumber' }, { status: 400 });
+    if (!name || !capacity || !ownerId || !licenseNumber || !type) {
+      return NextResponse.json({ message: 'Missing required fields: name, capacity, ownerId, licenseNumber, and type' }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -62,6 +62,7 @@ export async function POST(request: Request) {
       description,
       ownerId,
       licenseNumber,
+      type, // 'standard', 'luxury', 'speed'
       isValidated: false,
       captainId: null, // Captain is not assigned on creation
       createdAt: new Date(),
@@ -108,5 +109,3 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
   }
-
-    
