@@ -22,16 +22,11 @@ function deg2rad(deg: number) {
 
 // --- Uber-Style Pricing Constants ---
 // In a real app, these would be stored in an admin-controlled config in the DB
+const BASE_FARE = 100; // Flat starting charge in Ksh
 const RATE_PER_KM = 50; // Ksh per kilometer
 const RATE_PER_MINUTE = 10; // Ksh per minute
 const DEMAND_MULTIPLIER = 1.0; // Default, can be changed based on time/demand
 const AVERAGE_BOAT_SPEED_KPH = 15; // Average speed for a water taxi
-
-const BOAT_TYPE_BASE_FARE = {
-    standard: 100,
-    luxury: 300,
-    speed: 250,
-};
 // ---
 
 export async function GET(request: Request) {
@@ -39,10 +34,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const pickupName = searchParams.get('pickup');
     const destinationName = searchParams.get('destination');
-    const boatType = searchParams.get('boatType') as keyof typeof BOAT_TYPE_BASE_FARE;
-
-    if (!pickupName || !destinationName || !boatType) {
-      return NextResponse.json({ message: 'Missing required parameters: pickup, destination, and boatType' }, { status: 400 });
+    
+    if (!pickupName || !destinationName) {
+      return NextResponse.json({ message: 'Missing required parameters: pickup and destination' }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -63,11 +57,10 @@ export async function GET(request: Request) {
     const estimatedDurationHours = distanceKm / AVERAGE_BOAT_SPEED_KPH;
     const estimatedDurationMinutes = estimatedDurationHours * 60;
     
-    const baseFare = BOAT_TYPE_BASE_FARE[boatType] || BOAT_TYPE_BASE_FARE.standard;
     const distanceCharge = distanceKm * RATE_PER_KM;
     const durationCharge = estimatedDurationMinutes * RATE_PER_MINUTE;
 
-    const totalCalculatedFare = baseFare + distanceCharge + durationCharge;
+    const totalCalculatedFare = BASE_FARE + distanceCharge + durationCharge;
     const finalFare = Math.round(totalCalculatedFare * DEMAND_MULTIPLIER);
     // ---
 

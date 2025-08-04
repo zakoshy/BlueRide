@@ -216,7 +216,7 @@ export default function ProfilePage() {
     toast({ title: "Calculating fare...", description: "Please wait a moment." });
 
     try {
-      const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}&boatType=${boat.type}`);
+      const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}`);
       if (response.ok) {
         const data = await response.json();
         setBaseFare(data.fare);
@@ -545,5 +545,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
