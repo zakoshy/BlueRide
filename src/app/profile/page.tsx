@@ -445,10 +445,10 @@ export default function ProfilePage() {
                  </div>
                  <div className="space-y-2">
                     <div className="flex justify-between items-center font-semibold text-lg">
-                        <span>Estimated Fare:</span>
+                        <span>Fare:</span>
                         <span>Ksh {baseFare > 0 ? baseFare.toLocaleString() : <Skeleton className="h-6 w-20 inline-block"/>}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground text-center">Final fare will be confirmed by the boat owner.</p>
+                    <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
                  </div>
             </div>
             <DialogFooter>
