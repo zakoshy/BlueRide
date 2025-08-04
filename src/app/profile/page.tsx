@@ -212,20 +212,22 @@ export default function ProfilePage() {
       toast({ title: "Error", description: "Please select pickup and destination first.", variant: "destructive" });
       return;
     }
+    setBaseFare(0); // Reset fare and show loading state
+    setSelectedBoat(boat);
+    setIsBookingDialogOpen(true);
+
     try {
       const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}&boatType=${boat.type}`);
       if (response.ok) {
         const data = await response.json();
         setBaseFare(data.fare);
-        setSelectedBoat(boat);
-        setIsBookingDialogOpen(true);
       } else {
         toast({ title: "Error", description: "Could not calculate fare for this trip.", variant: "destructive" });
-        setBaseFare(0);
+        setIsBookingDialogOpen(false); // Close dialog on error
       }
     } catch (error) {
       toast({ title: "Error", description: "An unexpected error occurred while calculating the fare.", variant: "destructive" });
-      setBaseFare(0);
+      setIsBookingDialogOpen(false); // Close dialog on error
     }
   };
 
@@ -336,7 +338,7 @@ export default function ProfilePage() {
                         <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locationOptions.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locationOptions.find(l=>l.value === destination)?.label}</span></h2>
                         <div className="grid gap-6 md:grid-cols-2">
                             {boats.map(boat => (
-                                <Card key={boat._id} className="flex flex-col cursor-pointer hover:border-primary transition-colors">
+                                <Card key={boat._id} className="flex flex-col">
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
                                         <CardDescription>A reliable <span className="font-bold capitalize">{boat.type}</span> boat ready for your trip.</CardDescription>
@@ -459,7 +461,7 @@ export default function ProfilePage() {
                         <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
                     </div>
 
-                    <Tabs defaultValue="card" className="w-full">
+                    <Tabs defaultValue="mpesa" className="w-full">
                         <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="card">Card</TabsTrigger>
                         <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
@@ -546,3 +548,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
