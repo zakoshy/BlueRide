@@ -212,22 +212,21 @@ export default function ProfilePage() {
       toast({ title: "Error", description: "Please select pickup and destination first.", variant: "destructive" });
       return;
     }
-    setSelectedBoat(boat);
-    setBaseFare(0); // Reset fare and show loading state
-    setIsBookingDialogOpen(true);
+    
+    toast({ title: "Calculating fare...", description: "Please wait a moment." });
 
     try {
       const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}&boatType=${boat.type}`);
       if (response.ok) {
         const data = await response.json();
         setBaseFare(data.fare);
+        setSelectedBoat(boat);
+        setIsBookingDialogOpen(true);
       } else {
         toast({ title: "Error", description: "Could not calculate fare for this trip.", variant: "destructive" });
-        setIsBookingDialogOpen(false); // Close dialog on error
       }
     } catch (error) {
       toast({ title: "Error", description: "An unexpected error occurred while calculating the fare.", variant: "destructive" });
-      setIsBookingDialogOpen(false); // Close dialog on error
     }
   };
 
@@ -485,7 +484,7 @@ export default function ProfilePage() {
                         </TabsContent>
                         <TabsContent value="paypal">
                         <div className="space-y-4 rounded-md border bg-card p-4">
-                            <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                             <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
                                 Book Now (Pay Later)
                             </Button>
                         </div>
@@ -546,3 +545,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
