@@ -363,7 +363,7 @@ export default function DashboardPage() {
                          {boats.length > 0 ? boats.map(boat => (
                             <Card key={boat._id} className="p-4 flex flex-col sm:flex-row justify-between items-start gap-4">
                                 <div className="flex-grow">
-                                    <p className="font-semibold">{boat.name} <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge></p>
+                                    <div className="font-semibold">{boat.name} <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge></div>
                                     <p className="text-sm text-muted-foreground">Capacity: {boat.capacity} riders | License: {boat.licenseNumber}</p>
                                     <div className="mt-2 text-sm">
                                         <span className="font-medium">Captain:</span> {
@@ -394,5 +394,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
