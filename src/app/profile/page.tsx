@@ -191,7 +191,7 @@ export default function ProfilePage() {
         });
 
         if (response.ok) {
-            toast({ title: "Booking Request Sent!", description: "Your request has been sent to the boat owner. You'll be notified upon confirmation." });
+            toast({ title: "Booking Confirmed!", description: "Your trip is confirmed. Check 'My Bookings' for details and your receipt." });
             setIsBookingDialogOpen(false);
             setSelectedBoat(null);
             setBoats([]);
@@ -416,7 +416,7 @@ export default function ProfilePage() {
             <DialogHeader>
               <DialogTitle>Request a Trip on {selectedBoat?.name}</DialogTitle>
               <DialogDescription>
-                Confirm your trip details. The owner will confirm the final price and availability.
+                Confirm your trip details and complete payment to book your ride.
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh] p-1">
@@ -448,10 +448,13 @@ export default function ProfilePage() {
                             </div>
                         )}
                     </div>
+                    
                     <div className="space-y-2">
                         <div className="flex justify-between items-center font-semibold text-lg">
-                            <span>Fare:</span>
-                            <span>Ksh {baseFare > 0 ? baseFare.toLocaleString() : <Skeleton className="h-6 w-20 inline-block"/>}</span>
+                            <span>Total Fare:</span>
+                            <span>
+                                {baseFare > 0 ? `Ksh ${baseFare.toLocaleString()}` : <Skeleton className="h-6 w-20 inline-block"/>}
+                            </span>
                         </div>
                         <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
                     </div>
@@ -466,7 +469,7 @@ export default function ProfilePage() {
                         <div className="space-y-4 rounded-md border bg-card p-4">
                             <p className="text-center text-muted-foreground">Card payments are coming soon!</p>
                             <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                                Send Booking Request
+                                Book Now (Pay Later)
                             </Button>
                         </div>
                         </TabsContent>
@@ -483,7 +486,7 @@ export default function ProfilePage() {
                         <div className="space-y-4 rounded-md border bg-card p-4">
                             <p className="text-center text-muted-foreground">PayPal payments are coming soon!</p>
                             <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                                Send Booking Request
+                                Book Now (Pay Later)
                             </Button>
                         </div>
                         </TabsContent>
@@ -543,5 +546,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
