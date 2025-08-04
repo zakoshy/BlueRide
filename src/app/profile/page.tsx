@@ -212,8 +212,8 @@ export default function ProfilePage() {
       toast({ title: "Error", description: "Please select pickup and destination first.", variant: "destructive" });
       return;
     }
-    setBaseFare(0); // Reset fare and show loading state
     setSelectedBoat(boat);
+    setBaseFare(0); // Reset fare and show loading state
     setIsBookingDialogOpen(true);
 
     try {
@@ -469,8 +469,7 @@ export default function ProfilePage() {
                         </TabsList>
                         <TabsContent value="card">
                         <div className="space-y-4 rounded-md border bg-card p-4">
-                            <p className="text-center text-muted-foreground">Card payments are coming soon!</p>
-                            <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                             <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
                                 Book Now (Pay Later)
                             </Button>
                         </div>
@@ -486,7 +485,6 @@ export default function ProfilePage() {
                         </TabsContent>
                         <TabsContent value="paypal">
                         <div className="space-y-4 rounded-md border bg-card p-4">
-                            <p className="text-center text-muted-foreground">PayPal payments are coming soon!</p>
                             <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
                                 Book Now (Pay Later)
                             </Button>
@@ -548,5 +546,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
