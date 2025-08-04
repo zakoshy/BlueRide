@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, Radio } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 // Define types for our data structures
 interface Location {
@@ -53,6 +55,7 @@ export default function ProfilePage() {
   const [bookingType, setBookingType] = useState<'seat' | 'whole_boat'>('seat');
   const [numSeats, setNumSeats] = useState(1);
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
+  const [fare, setFare] = useState(0);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -117,6 +120,12 @@ export default function ProfilePage() {
         return;
     }
     
+    // Simulate payment success before creating booking
+     toast({
+        title: "Payment Successful!",
+        description: `Your payment of Ksh ${fare.toLocaleString()} has been processed.`,
+    });
+    
     const bookingDetails = {
         boatId: selectedBoat._id,
         riderId: user.uid,
@@ -148,6 +157,19 @@ export default function ProfilePage() {
         toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
     }
   }
+  
+  const calculateFare = useCallback(() => {
+    const calculatedFare = bookingType === 'whole_boat' ? 5000 : numSeats * 750;
+    setFare(calculatedFare);
+  }, [bookingType, numSeats]);
+
+
+  useEffect(() => {
+    if (isBookingDialogOpen) {
+      calculateFare();
+    }
+  }, [isBookingDialogOpen, bookingType, numSeats, calculateFare]);
+
 
   const handleOpenBookingDialog = (boat: Boat) => {
     setSelectedBoat(boat);
@@ -258,46 +280,99 @@ export default function ProfilePage() {
       </main>
 
        <Dialog open={isBookingDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null); setIsBookingDialogOpen(isOpen); }}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Book Your Trip on {selectedBoat?.name}</DialogTitle>
               <DialogDescription>
-                Choose how you'd like to book and confirm your details.
+                Confirm your booking details and complete payment to reserve your ride.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <p className="text-sm text-muted-foreground">
-                    You are booking a trip from <span className="font-semibold text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locations.find(l=>l.value === destination)?.label}</span>.
-                </p>
-                <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
-                    <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="seat">Book one or more seats</SelectItem>
-                        <SelectItem value="whole_boat">Book the whole boat</SelectItem>
-                    </SelectContent>
-                </Select>
+            <div className="grid gap-6 py-4">
+                 <div className="space-y-4 rounded-lg border p-4">
+                     <p className="text-sm text-muted-foreground">
+                        You are booking a trip from <span className="font-semibold text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locations.find(l=>l.value === destination)?.label}</span>.
+                    </p>
+                    <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
+                        <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="seat">Book one or more seats</SelectItem>
+                            <SelectItem value="whole_boat">Book the whole boat</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-                {bookingType === 'seat' && (
-                    <div className="grid gap-2">
-                        <Label htmlFor="seats">Number of Seats</Label>
-                        <Input 
-                            id="seats" 
-                            type="number" 
-                            value={numSeats}
-                            onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10)))}
-                            min="1"
-                            max={selectedBoat?.capacity}
-                        />
-                         <p className="text-xs text-muted-foreground">Max capacity: {selectedBoat?.capacity} seats.</p>
+                    {bookingType === 'seat' && (
+                        <div className="grid gap-2">
+                            <Label htmlFor="seats">Number of Seats</Label>
+                            <Input 
+                                id="seats" 
+                                type="number" 
+                                value={numSeats}
+                                onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10)))}
+                                min="1"
+                                max={selectedBoat?.capacity}
+                            />
+                            <p className="text-xs text-muted-foreground">Max capacity: {selectedBoat?.capacity} seats.</p>
+                        </div>
+                    )}
+                 </div>
+
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center font-semibold text-lg">
+                        <span>Total Fare:</span>
+                        <span>Ksh {fare.toLocaleString()}</span>
                     </div>
-                )}
+
+                    <Tabs defaultValue="mpesa" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
+                            <TabsTrigger value="card">Card</TabsTrigger>
+                            <TabsTrigger value="paypal">PayPal</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="mpesa" className="mt-4">
+                             <Card className="p-4">
+                                <p className="text-sm text-center text-muted-foreground">An STK push will be sent to your registered phone number to complete the payment.</p>
+                            </Card>
+                        </TabsContent>
+                         <TabsContent value="card" className="mt-4">
+                             <Card className="p-4 space-y-4">
+                               <div className="space-y-2">
+                                 <Label htmlFor="card-number">Card Number</Label>
+                                 <Input id="card-number" placeholder="•••• •••• •••• ••••" />
+                               </div>
+                               <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="expiry">Expiry</Label>
+                                    <Input id="expiry" placeholder="MM/YY" />
+                                </div>
+                                 <div className="space-y-2">
+                                    <Label htmlFor="cvc">CVC</Label>
+                                    <Input id="cvc" placeholder="•••" />
+                                </div>
+                               </div>
+                             </Card>
+                        </TabsContent>
+                         <TabsContent value="paypal" className="mt-4">
+                             <Card className="p-4 text-center">
+                                 <p className="text-sm text-muted-foreground mb-4">You will be redirected to PayPal to complete your payment securely.</p>
+                                <Button variant="outline" className="w-full bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
+                                    <Radio className="mr-2"/> Continue with PayPal
+                                </Button>
+                             </Card>
+                        </TabsContent>
+                    </Tabs>
+
+                 </div>
             </div>
-            <CardFooter className="justify-end gap-2">
+            <DialogFooter>
               <Button variant="ghost" onClick={() => setIsBookingDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleBookingSubmit}>Confirm Booking</Button>
-            </CardFooter>
+              <Button onClick={handleBookingSubmit} className="w-full sm:w-auto">
+                Pay Ksh {fare.toLocaleString()} & Confirm Booking
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
     </div>
   );
 }
+
+    
