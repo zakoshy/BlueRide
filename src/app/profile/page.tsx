@@ -206,34 +206,29 @@ export default function ProfilePage() {
         toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
     }
   }
-  
-  const calculateFare = useCallback(async (boatType: string) => {
-    if (!pickup || !destination) return 0;
+
+  const handleOpenBookingDialog = async (boat: Boat) => {
+    if (!pickup || !destination) {
+      toast({ title: "Error", description: "Please select pickup and destination first.", variant: "destructive" });
+      return;
+    }
     try {
-        const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}&boatType=${boatType}`);
-        if(response.ok) {
-            const data = await response.json();
-            setBaseFare(data.fare);
-        } else {
-            setBaseFare(0);
-        }
-    } catch {
+      const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}&boatType=${boat.type}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBaseFare(data.fare);
+        setSelectedBoat(boat);
+        setIsBookingDialogOpen(true);
+      } else {
+        toast({ title: "Error", description: "Could not calculate fare for this trip.", variant: "destructive" });
         setBaseFare(0);
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "An unexpected error occurred while calculating the fare.", variant: "destructive" });
+      setBaseFare(0);
     }
-  }, [pickup, destination]);
+  };
 
-
-  useEffect(() => {
-    if (isBookingDialogOpen && selectedBoat) {
-      calculateFare(selectedBoat.type);
-    }
-  }, [isBookingDialogOpen, selectedBoat, calculateFare]);
-
-
-  const handleOpenBookingDialog = (boat: Boat) => {
-    setSelectedBoat(boat);
-    setIsBookingDialogOpen(true);
-  }
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
@@ -548,3 +543,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
