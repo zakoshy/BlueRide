@@ -59,6 +59,8 @@ export async function GET(
                 seats: 1,
                 status: 1,
                 createdAt: 1,
+                baseFare: 1,
+                finalFare: 1,
                 rider: {
                     name: "$riderInfo.name"
                 },
