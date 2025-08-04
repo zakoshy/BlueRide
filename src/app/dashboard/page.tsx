@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -110,7 +110,7 @@ export default function DashboardPage() {
             // Initialize adjustments state
             const initialAdjustments: Record<string, number> = {};
             bookingsData.forEach((b: Booking) => {
-                if(b.status === 'pending') initialAdjustments[b._id] = 0;
+                initialAdjustments[b._id] = b.adjustmentPercent || 0;
             });
             setCurrentAdjustments(initialAdjustments);
         } else {
@@ -210,19 +210,12 @@ export default function DashboardPage() {
     }
   }
 
-  const handleBookingStatusUpdate = async (bookingId: string, status: 'accepted' | 'rejected', baseFare: number) => {
-    let payload: any = { bookingId, status };
-    if (status === 'accepted') {
-        const adjustmentPercent = currentAdjustments[bookingId] || 0;
-        const finalFare = baseFare * (1 + adjustmentPercent / 100);
-        payload = { ...payload, finalFare, adjustmentPercent };
-    }
-
+  const handleBookingStatusUpdate = async (bookingId: string, status: 'completed' | 'rejected') => {
     try {
         const response = await fetch('/api/bookings/status', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ bookingId, status }),
         });
 
         if(response.ok) {
@@ -238,6 +231,30 @@ export default function DashboardPage() {
          toast({ title: "Error", description: "An unexpected error occurred while updating booking.", variant: "destructive" });
     }
   };
+  
+  const handleFareAdjustment = async (bookingId: string, baseFare: number) => {
+    const adjustmentPercent = currentAdjustments[bookingId] || 0;
+    const finalFare = baseFare * (1 + adjustmentPercent / 100);
+
+    try {
+         const response = await fetch('/api/bookings/adjust', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId, finalFare, adjustmentPercent }),
+        });
+
+        if(response.ok) {
+             toast({ title: "Success", description: `Fare has been adjusted successfully.` });
+             if (user) fetchOwnerData(user); // Refresh to show new final fare
+        } else {
+             const errorData = await response.json();
+             toast({ title: "Adjustment Failed", description: errorData.message || "Could not adjust fare.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to adjust fare", error);
+        toast({ title: "Error", description: "An unexpected error occurred while adjusting the fare.", variant: "destructive" });
+    }
+  }
 
 
   if (loading || authLoading) {
@@ -293,8 +310,8 @@ export default function DashboardPage() {
     }
   };
   
-  const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const confirmedBookings = bookings.filter(b => ['confirmed', 'completed', 'rejected'].includes(b.status));
+  const activeBookings = bookings.filter(b => b.status === 'confirmed');
+  const pastBookings = bookings.filter(b => ['completed', 'rejected'].includes(b.status));
   const getFinalFare = (baseFare: number, adjustment: number) => baseFare * (1 + adjustment/100);
 
   return (
@@ -303,7 +320,7 @@ export default function DashboardPage() {
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Owner'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage your boats and view incoming bookings all in one place.</p>
+        <p className="text-muted-foreground mb-8">Manage your boats and bookings. All new bookings are auto-confirmed.</p>
         
         <Tabs defaultValue="bookings">
             <TabsList className="grid w-full grid-cols-2">
@@ -314,13 +331,13 @@ export default function DashboardPage() {
             <TabsContent value="bookings" className="mt-6 space-y-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookOpen/>Pending Requests</CardTitle>
-                        <CardDescription>Accept or reject new booking requests. Adjust the final fare within a {MAX_ADJUSTMENT}% range.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><BookOpen/>Active Bookings</CardTitle>
+                        <CardDescription>These trips are confirmed and awaiting completion. You can adjust the final fare or mark them as complete.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                         {pendingBookings.length > 0 ? (
+                         {activeBookings.length > 0 ? (
                            <div className="space-y-4">
-                                {pendingBookings.map(booking => (
+                                {activeBookings.map(booking => (
                                     <Card key={booking._id} className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                                         <div className="col-span-1">
                                              <div className="font-semibold">{booking.boat?.name || 'N/A'}</div>
@@ -350,15 +367,15 @@ export default function DashboardPage() {
                                                  )}
                                             </div>
                                         </div>
-                                        <div className="col-span-1 flex justify-end gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => handleBookingStatusUpdate(booking._id, 'rejected', booking.baseFare)}>Reject</Button>
-                                            <Button size="sm" onClick={() => handleBookingStatusUpdate(booking._id, 'accepted', booking.baseFare)}>Accept</Button>
+                                        <div className="col-span-1 flex flex-col items-end gap-2">
+                                            <Button size="sm" className="w-full sm:w-auto" onClick={() => handleFareAdjustment(booking._id, booking.baseFare)}>Update Fare</Button>
+                                            <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => handleBookingStatusUpdate(booking._id, 'completed')}><CheckSquare className="mr-2 h-4 w-4"/>Mark as Completed</Button>
                                         </div>
                                     </Card>
                                 ))}
                            </div>
                         ) : (
-                            <p className="text-center text-muted-foreground py-8">You have no pending booking requests.</p>
+                            <p className="text-center text-muted-foreground py-8">You have no active bookings right now.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -371,7 +388,7 @@ export default function DashboardPage() {
                     </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {confirmedBookings.length > 0 ? (
+                        {pastBookings.length > 0 ? (
                            <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -384,7 +401,7 @@ export default function DashboardPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {confirmedBookings.map(booking => (
+                                    {pastBookings.map(booking => (
                                         <TableRow key={booking._id}>
                                             <TableCell>{booking.rider?.name || 'N/A'}</TableCell>
                                             <TableCell>{booking.boat?.name || 'N/A'}</TableCell>

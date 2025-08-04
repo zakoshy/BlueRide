@@ -46,18 +46,14 @@ async function createTripFinancials(booking: any) {
 
 export async function PUT(request: Request) {
     try {
-      const { bookingId, status, finalFare, adjustmentPercent } = await request.json();
+      const { bookingId, status } = await request.json();
   
       if (!bookingId || !status) {
         return NextResponse.json({ message: 'Missing required fields: bookingId and status' }, { status: 400 });
       }
 
-      if (!['accepted', 'rejected', 'completed'].includes(status)) {
-        return NextResponse.json({ message: 'Invalid status provided. Must be "accepted", "rejected", or "completed".' }, { status: 400 });
-      }
-      
-      if (status === 'accepted' && (finalFare === undefined || adjustmentPercent === undefined)) {
-         return NextResponse.json({ message: 'Accepted bookings must have a finalFare and adjustmentPercent' }, { status: 400 });
+      if (!['rejected', 'completed'].includes(status)) {
+        return NextResponse.json({ message: 'Invalid status provided. Must be "rejected" or "completed".' }, { status: 400 });
       }
   
       if (!ObjectId.isValid(bookingId)) {
@@ -69,13 +65,7 @@ export async function PUT(request: Request) {
       const bookingsCollection = db.collection('bookings');
   
       const updateData: any = { status };
-      if (status === 'accepted') {
-        updateData.finalFare = finalFare;
-        updateData.adjustmentPercent = adjustmentPercent;
-        // Rider has paid, so we confirm the booking
-        updateData.status = 'confirmed';
-      }
-
+      
       const result = await bookingsCollection.updateOne(
         { _id: new ObjectId(bookingId) },
         { $set: updateData }

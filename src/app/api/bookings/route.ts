@@ -47,9 +47,9 @@ export async function POST(request: Request) {
       bookingType,
       ...(seats && { seats }), // Conditionally add seats
       baseFare,
-      finalFare: null,
-      adjustmentPercent: null,
-      status: 'pending', // Awaiting owner confirmation
+      finalFare: baseFare, // Initially, final fare is the base fare
+      adjustmentPercent: 0, // Initially, no adjustment
+      status: 'confirmed', // Auto-confirm bookings
       createdAt: new Date(),
     };
 
