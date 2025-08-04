@@ -246,6 +246,8 @@ export default function ProfilePage() {
        </div>
     )
   }
+  
+  const paidBookings = userBookings.filter(b => b.status === 'confirmed' || b.status === 'completed');
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -350,9 +352,9 @@ export default function ProfilePage() {
                                <Skeleton className="h-16 w-full" />
                                <Skeleton className="h-16 w-full" />
                            </div>
-                        ) : userBookings.length > 0 ? (
+                        ) : paidBookings.length > 0 ? (
                             <div className="space-y-4">
-                                {userBookings.map(booking => (
+                                {paidBookings.map(booking => (
                                     <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
                                         <div>
                                             <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
