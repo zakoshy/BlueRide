@@ -19,6 +19,11 @@ const Command = React.forwardRef<
       "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
       className
     )}
+    // Add a custom filter to prevent CMDK from clearing the input
+    filter={(value, search) => {
+      if (value.toLowerCase().includes(search.toLowerCase())) return 1
+      return 0
+    }}
     {...props}
   />
 ))
