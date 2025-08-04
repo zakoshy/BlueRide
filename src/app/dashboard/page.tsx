@@ -323,7 +323,7 @@ export default function DashboardPage() {
                                 {pendingBookings.map(booking => (
                                     <Card key={booking._id} className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                                         <div className="col-span-1">
-                                             <p className="font-semibold">{booking.boat?.name || 'N/A'}</p>
+                                             <div className="font-semibold">{booking.boat?.name || 'N/A'}</div>
                                              <p className="text-sm text-muted-foreground">Rider: {booking.rider?.name || 'N/A'}</p>
                                              <p className="text-xs">{booking.pickup} to {booking.destination}</p>
                                              <p className="text-xs text-muted-foreground">{booking.bookingType === 'seat' ? `${booking.seats} seat(s)` : 'Whole boat'}</p>
@@ -342,8 +342,12 @@ export default function DashboardPage() {
                                                 <Plus className="h-4 w-4 text-muted-foreground"/>
                                             </div>
                                             <div className="text-center">
-                                                <p className="text-xs text-muted-foreground">Base: Ksh {booking.baseFare.toLocaleString()}</p>
-                                                <p className="font-semibold">Final: Ksh {getFinalFare(booking.baseFare, currentAdjustments[booking._id] || 0).toLocaleString()}</p>
+                                                 {typeof booking.baseFare === 'number' && (
+                                                    <>
+                                                        <p className="text-xs text-muted-foreground">Base: Ksh {booking.baseFare.toLocaleString()}</p>
+                                                        <p className="font-semibold">Final: Ksh {getFinalFare(booking.baseFare, currentAdjustments[booking._id] || 0).toLocaleString()}</p>
+                                                    </>
+                                                 )}
                                             </div>
                                         </div>
                                         <div className="col-span-1 flex justify-end gap-2">
