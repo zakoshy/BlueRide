@@ -20,20 +20,26 @@ function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
 
-// Pricing constants (could be moved to admin-controlled config)
-const RATE_PER_KM = 30; // Ksh per kilometer
-const BOAT_TYPE_BASE_RATE = {
+// --- Uber-Style Pricing Constants ---
+// In a real app, these would be stored in an admin-controlled config in the DB
+const RATE_PER_KM = 50; // Ksh per kilometer
+const RATE_PER_MINUTE = 10; // Ksh per minute
+const DEMAND_MULTIPLIER = 1.0; // Default, can be changed based on time/demand
+const AVERAGE_BOAT_SPEED_KPH = 15; // Average speed for a water taxi
+
+const BOAT_TYPE_BASE_FARE = {
     standard: 100,
     luxury: 300,
-    speed: 200,
+    speed: 250,
 };
+// ---
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const pickupName = searchParams.get('pickup');
     const destinationName = searchParams.get('destination');
-    const boatType = searchParams.get('boatType') as keyof typeof BOAT_TYPE_BASE_RATE;
+    const boatType = searchParams.get('boatType') as keyof typeof BOAT_TYPE_BASE_FARE;
 
     if (!pickupName || !destinationName || !boatType) {
       return NextResponse.json({ message: 'Missing required parameters: pickup, destination, and boatType' }, { status: 400 });
@@ -50,14 +56,26 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: 'One or both locations not found' }, { status: 404 });
     }
 
-    const distance = getDistance(pickupLocation.lat, pickupLocation.lng, destinationLocation.lat, destinationLocation.lng);
+    // --- Fare Calculation ---
+    const distanceKm = getDistance(pickupLocation.lat, pickupLocation.lng, destinationLocation.lat, destinationLocation.lng);
     
-    const baseRate = BOAT_TYPE_BASE_RATE[boatType] || BOAT_TYPE_BASE_RATE.standard;
-    const distanceCharge = distance * RATE_PER_KM;
+    // Estimate duration in minutes
+    const estimatedDurationHours = distanceKm / AVERAGE_BOAT_SPEED_KPH;
+    const estimatedDurationMinutes = estimatedDurationHours * 60;
+    
+    const baseFare = BOAT_TYPE_BASE_FARE[boatType] || BOAT_TYPE_BASE_FARE.standard;
+    const distanceCharge = distanceKm * RATE_PER_KM;
+    const durationCharge = estimatedDurationMinutes * RATE_PER_MINUTE;
 
-    const fare = Math.round(baseRate + distanceCharge);
+    const totalCalculatedFare = baseFare + distanceCharge + durationCharge;
+    const finalFare = Math.round(totalCalculatedFare * DEMAND_MULTIPLIER);
+    // ---
 
-    return NextResponse.json({ fare, distance }, { status: 200 });
+    return NextResponse.json({ 
+        fare: finalFare, 
+        distance: distanceKm, 
+        duration: estimatedDurationMinutes 
+    }, { status: 200 });
 
   } catch (error) {
     console.error('Error calculating fare:', error);
