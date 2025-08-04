@@ -20,6 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Combobox } from "@/components/ui/combobox";
 import type { User as FirebaseUser } from "firebase/auth";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 
 interface UserProfile {
   _id: string;
@@ -49,7 +51,7 @@ interface Booking {
     destination: string;
     bookingType: 'seat' | 'whole_boat';
     seats?: number;
-    status: 'pending' | 'accepted' | 'rejected';
+    status: 'pending' | 'accepted' | 'rejected' | 'confirmed' | 'completed';
     createdAt: string;
     rider?: { name: string };
     boat?: { name: string };
@@ -177,27 +179,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleBookingStatusChange = async (bookingId: string, status: 'accepted' | 'rejected') => {
-    try {
-        const response = await fetch(`/api/bookings/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bookingId, status }),
-        });
-
-        if (response.ok) {
-            toast({ title: "Success", description: `Booking has been ${status}.` });
-            if (user) fetchOwnerData(user); // Refresh bookings
-        } else {
-            const errorData = await response.json();
-            toast({ title: "Update Failed", description: errorData.message || "Could not update booking status.", variant: "destructive" });
-        }
-    } catch (error) {
-        console.error("Failed to update booking status", error);
-        toast({ title: "Error", description: "An unexpected error occurred during status update.", variant: "destructive" });
-    }
-  };
-
   const handleAssignCaptain = async (boatId: string, captainId: string) => {
      try {
         const response = await fetch(`/api/boats/captain`, {
@@ -263,6 +244,15 @@ export default function DashboardPage() {
   }
 
   const captainOptions = captains.map(c => ({ value: c.uid, label: `${c.name} (${c.email})`}));
+  const statusVariant = (status: Booking['status']) => {
+    switch (status) {
+        case 'confirmed': return 'default';
+        case 'completed': return 'secondary';
+        case 'rejected': return 'destructive';
+        default: return 'outline';
+    }
+  };
+
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -270,47 +260,51 @@ export default function DashboardPage() {
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Owner'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage your boats and bookings all in one place.</p>
+        <p className="text-muted-foreground mb-8">Manage your boats and view incoming bookings all in one place.</p>
         
         <Tabs defaultValue="bookings">
             <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="bookings">Booking Requests</TabsTrigger>
+                <TabsTrigger value="bookings">All Bookings</TabsTrigger>
                 <TabsTrigger value="boats">My Fleet</TabsTrigger>
             </TabsList>
 
             <TabsContent value="bookings" className="mt-6">
                  <Card>
                     <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><BookOpen/>Incoming Bookings</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><BookOpen/>Confirmed Trips</CardTitle>
                     <CardDescription>
-                        Review and respond to new ride requests from riders.
+                       This is a log of all confirmed bookings for your boats.
                     </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-4">
-                            {bookings.length > 0 ? bookings.map(booking => (
-                                <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
-                                    <div>
-                                        <p className="font-semibold">{booking.rider?.name || 'A rider'} booked <span className="text-primary">{booking.boat?.name || 'a boat'}</span></p>
-                                        <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {booking.bookingType === 'seat' ? `${booking.seats} seat(s)` : 'Whole boat'}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-2 self-end sm:self-center">
-                                         <Badge variant={booking.status === 'pending' ? 'default' : booking.status === 'accepted' ? 'secondary' : 'destructive'} >{booking.status}</Badge>
-                                         {booking.status === 'pending' && (
-                                            <>
-                                                <Button size="sm" variant="outline" onClick={() => handleBookingStatusChange(booking._id, 'rejected')}>Reject</Button>
-                                                <Button size="sm" onClick={() => handleBookingStatusChange(booking._id, 'accepted')}>Accept</Button>
-                                            </>
-                                         )}
-                                    </div>
-                                </Card>
-                            )) : (
-                                <p className="text-center text-muted-foreground py-4">You have no new booking requests.</p>
-                            )}
-                        </div>
+                        {bookings.length > 0 ? (
+                           <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Rider</TableHead>
+                                        <TableHead>Boat</TableHead>
+                                        <TableHead>Route</TableHead>
+                                        <TableHead>Trip Details</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {bookings.map(booking => (
+                                        <TableRow key={booking._id}>
+                                            <TableCell>{booking.rider?.name || 'N/A'}</TableCell>
+                                            <TableCell>{booking.boat?.name || 'N/A'}</TableCell>
+                                            <TableCell className="text-xs">{booking.pickup}<br/>to {booking.destination}</TableCell>
+                                            <TableCell className="text-sm">{booking.bookingType === 'seat' ? `${booking.seats} seat(s)` : 'Whole boat'}</TableCell>
+                                            <TableCell>{new Date(booking.createdAt).toLocaleDateString()}</TableCell>
+                                            <TableCell><Badge variant={statusVariant(booking.status)}>{booking.status}</Badge></TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                           </Table>
+                        ) : (
+                            <p className="text-center text-muted-foreground py-8">You have no bookings yet.</p>
+                        )}
                     </CardContent>
                 </Card>
             </TabsContent>

@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       destination,
       bookingType,
       ...(seats && { seats }), // Conditionally add seats
-      status: 'pending', // Bookings are pending until owner confirms
+      status: 'confirmed', // Bookings are now confirmed instantly upon payment
       createdAt: new Date(),
     };
 
@@ -57,4 +57,50 @@ export async function POST(request: Request) {
     console.error('Error creating booking:', error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
+}
+
+// GET bookings for a specific rider
+export async function GET(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const riderId = searchParams.get('riderId');
+
+        if (!riderId) {
+            return NextResponse.json({ message: 'Rider ID is required' }, { status: 400 });
+        }
+
+        const client = await clientPromise;
+        const db = client.db();
+        const bookings = await db.collection('bookings').aggregate([
+            { $match: { riderId: riderId } },
+            { $sort: { createdAt: -1 } },
+            {
+                $lookup: {
+                    from: 'boats',
+                    localField: 'boatId',
+                    foreignField: '_id',
+                    as: 'boatInfo'
+                }
+            },
+            { $unwind: { path: '$boatInfo', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    pickup: 1,
+                    destination: 1,
+                    status: 1,
+                    createdAt: 1,
+                    bookingType: 1,
+                    seats: 1,
+                    boat: { name: '$boatInfo.name' }
+                }
+            }
+        ]).toArray();
+
+        return NextResponse.json(bookings, { status: 200 });
+
+    } catch (error) {
+        console.error('Error fetching rider bookings:', error);
+        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    }
 }

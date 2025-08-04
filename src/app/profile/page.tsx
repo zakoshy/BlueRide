@@ -3,19 +3,21 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, Radio } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, Radio, BookCopy, Printer, Ticket } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useReactToPrint } from 'react-to-print';
+import { Badge } from "@/components/ui/badge";
 
 
 // Define types for our data structures
@@ -40,6 +42,17 @@ interface Boat {
   isValidated: boolean;
 }
 
+interface Booking {
+  _id: string;
+  pickup: string;
+  destination: string;
+  status: 'confirmed' | 'completed' | 'cancelled';
+  createdAt: string;
+  bookingType: 'seat' | 'whole_boat';
+  seats?: number;
+  boat?: { name: string };
+}
+
 export default function ProfilePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -58,12 +71,41 @@ export default function ProfilePage() {
   const [fare, setFare] = useState(0);
   const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState("");
 
+  // Bookings History
+  const [userBookings, setUserBookings] = useState<Booking[]>([]);
+  const [isFetchingBookings, setIsFetchingBookings] = useState(false);
+  const [receiptData, setReceiptData] = useState<Booking | null>(null);
+  const receiptRef = useRef(null);
+
+  const handlePrint = useReactToPrint({
+    content: () => receiptRef.current,
+    documentTitle: `BlueRide-Receipt-${receiptData?._id}`,
+  });
+
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  const fetchUserBookings = useCallback(async () => {
+    if (!user) return;
+    setIsFetchingBookings(true);
+    try {
+        const response = await fetch(`/api/bookings?riderId=${user.uid}`);
+        if(response.ok) {
+            const data = await response.json();
+            setUserBookings(data);
+        } else {
+            toast({ title: "Error", description: "Failed to fetch your booking history.", variant: "destructive" });
+        }
+    } catch(error) {
+        toast({ title: "Error", description: "An unexpected error occurred while fetching your bookings.", variant: "destructive" });
+    } finally {
+        setIsFetchingBookings(false);
+    }
+  }, [user, toast]);
 
   useEffect(() => {
     // Fetch all available locations
@@ -81,7 +123,8 @@ export default function ProfilePage() {
       }
     };
     fetchLocations();
-  }, [toast]);
+    fetchUserBookings();
+  }, [toast, fetchUserBookings]);
   
   const handleFindBoat = useCallback(async () => {
     if (!pickup || !destination) {
@@ -145,12 +188,13 @@ export default function ProfilePage() {
         });
 
         if (response.ok) {
-            toast({ title: "Booking Successful!", description: "Your request has been sent to the boat owner for confirmation." });
+            toast({ title: "Booking Confirmed!", description: "Your trip is confirmed. You can view your receipt in the 'My Bookings' tab." });
             setIsBookingDialogOpen(false);
             setSelectedBoat(null);
             setBoats([]);
             setPickup("");
             setDestination("");
+            fetchUserBookings(); // Refresh booking history
         } else {
             const errorData = await response.json();
             toast({ title: "Booking Failed", description: errorData.message || "Could not complete booking.", variant: "destructive" });
@@ -178,6 +222,16 @@ export default function ProfilePage() {
     setIsBookingDialogOpen(true);
   }
 
+  const handleViewReceipt = (booking: Booking) => {
+    setReceiptData(booking);
+  };
+  
+   useEffect(() => {
+    if (receiptData) {
+      handlePrint();
+    }
+  }, [receiptData, handlePrint]);
+
 
   if (loading || !user) {
     return (
@@ -204,80 +258,131 @@ export default function ProfilePage() {
         <div className="w-full max-w-4xl space-y-8">
           <div>
             <h1 className="text-3xl font-bold">Welcome, {user.displayName}!</h1>
-            <p className="text-muted-foreground">Ready for your next adventure? Find your ride below.</p>
+            <p className="text-muted-foreground">Ready for your next adventure? Find your ride or view your bookings below.</p>
           </div>
 
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Sailboat/> Find Your Ride</CardTitle>
-              <CardDescription>Select your pickup and destination points to see available water taxis.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 md:gap-8">
-                    <div className="grid w-full gap-1.5">
-                        <Label htmlFor="from">From</Label>
-                        <Combobox
-                            options={locations.filter(l => l.value !== destination)}
-                            selectedValue={pickup}
-                            onSelect={setPickup}
-                            placeholder="Select pickup..."
-                            searchPlaceholder="Search locations..."
-                            notFoundText="No locations found."
-                        />
-                    </div>
-                     <div className="grid w-full gap-1.5">
-                        <Label htmlFor="to">To</Label>
-                         <Combobox
-                            options={locations.filter(l => l.value !== pickup)}
-                            selectedValue={destination}
-                            onSelect={setDestination}
-                            placeholder="Select destination..."
-                            searchPlaceholder="Search locations..."
-                            notFoundText="No locations found."
-                        />
-                    </div>
-                </div>
-            </CardContent>
-            <CardFooter>
-                 <Button onClick={handleFindBoat} disabled={isFinding || !pickup || !destination}>
-                    {isFinding ? "Searching..." : "Find a Boat"}
-                </Button>
-            </CardFooter>
-          </Card>
+        <Tabs defaultValue="find-ride">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="find-ride">Find a Ride</TabsTrigger>
+                <TabsTrigger value="my-bookings">My Bookings</TabsTrigger>
+            </TabsList>
 
-          {isFinding && (
-            <div className="space-y-4">
-                <h2 className="text-2xl font-bold">Searching for available boats...</h2>
-                <div className="grid gap-6 md:grid-cols-2">
-                    <Skeleton className="h-48 w-full" />
-                    <Skeleton className="h-48 w-full" />
-                </div>
-            </div>
-          )}
+             <TabsContent value="find-ride">
+                <Card className="shadow-lg mt-6">
+                    <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Sailboat/> Find Your Ride</CardTitle>
+                    <CardDescription>Select your pickup and destination points to see available water taxis.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-4 md:grid-cols-2 md:gap-8">
+                            <div className="grid w-full gap-1.5">
+                                <Label htmlFor="from">From</Label>
+                                <Combobox
+                                    options={locations.filter(l => l.value !== destination)}
+                                    selectedValue={pickup}
+                                    onSelect={setPickup}
+                                    placeholder="Select pickup..."
+                                    searchPlaceholder="Search locations..."
+                                    notFoundText="No locations found."
+                                />
+                            </div>
+                            <div className="grid w-full gap-1.5">
+                                <Label htmlFor="to">To</Label>
+                                <Combobox
+                                    options={locations.filter(l => l.value !== pickup)}
+                                    selectedValue={destination}
+                                    onSelect={setDestination}
+                                    placeholder="Select destination..."
+                                    searchPlaceholder="Search locations..."
+                                    notFoundText="No locations found."
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                        <Button onClick={handleFindBoat} disabled={isFinding || !pickup || !destination}>
+                            {isFinding ? "Searching..." : "Find a Boat"}
+                        </Button>
+                    </CardFooter>
+                </Card>
 
-          {boats.length > 0 && pickup && destination && (
-            <div className="space-y-6">
-                <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locations.find(l=>l.value === destination)?.label}</span></h2>
-                <div className="grid gap-6 md:grid-cols-2">
-                    {boats.map(boat => (
-                        <Card key={boat._id} className="flex flex-col cursor-pointer hover:border-primary transition-colors">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
-                                <CardDescription>A reliable boat ready for your trip.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-grow">
-                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                    <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
-                                </div>
-                            </CardContent>
-                            <CardFooter>
-                                <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>Book a trip</Button>
-                            </CardFooter>
-                        </Card>
-                    ))}
-                </div>
-            </div>
-          )}
+                {isFinding && (
+                    <div className="space-y-4 mt-8">
+                        <h2 className="text-2xl font-bold">Searching for available boats...</h2>
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <Skeleton className="h-48 w-full" />
+                            <Skeleton className="h-48 w-full" />
+                        </div>
+                    </div>
+                )}
+
+                {boats.length > 0 && pickup && destination && (
+                    <div className="space-y-6 mt-8">
+                        <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locations.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locations.find(l=>l.value === destination)?.label}</span></h2>
+                        <div className="grid gap-6 md:grid-cols-2">
+                            {boats.map(boat => (
+                                <Card key={boat._id} className="flex flex-col cursor-pointer hover:border-primary transition-colors">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
+                                        <CardDescription>A reliable boat ready for your trip.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex-grow">
+                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                            <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
+                                        </div>
+                                    </CardContent>
+                                    <CardFooter>
+                                        <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>Book a trip</Button>
+                                    </CardFooter>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                )}
+             </TabsContent>
+
+             <TabsContent value="my-bookings">
+                <Card className="mt-6">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><BookCopy/>Your Booking History</CardTitle>
+                        <CardDescription>Here are all your past and upcoming trips. You can print your receipt from here.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {isFetchingBookings ? (
+                           <div className="space-y-4">
+                               <Skeleton className="h-16 w-full" />
+                               <Skeleton className="h-16 w-full" />
+                           </div>
+                        ) : userBookings.length > 0 ? (
+                            <div className="space-y-4">
+                                {userBookings.map(booking => (
+                                    <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
+                                        <div>
+                                            <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
+                                            <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
+                                            <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
+                                        </div>
+                                         <div className="flex items-center gap-2 self-end sm:self-center">
+                                            <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>{booking.status}</Badge>
+                                             <Button variant="outline" size="sm" onClick={() => handleViewReceipt(booking)}>
+                                                 <Printer className="mr-2 h-4 w-4"/> View Receipt
+                                             </Button>
+                                         </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : (
+                             <div className="text-center py-12">
+                                <Ticket className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <h3 className="mt-4 text-lg font-medium">No Bookings Yet</h3>
+                                <p className="mt-1 text-sm text-muted-foreground">You haven't booked any trips. Find one today!</p>
+                             </div>
+                        )}
+                    </CardContent>
+                </Card>
+             </TabsContent>
+
+          </Tabs>
         </div>
       </main>
 
@@ -380,6 +485,49 @@ export default function ProfilePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Hidden printable receipt component */}
+        <div className="hidden">
+            {receiptData && (
+                 <div ref={receiptRef} className="p-10 font-sans">
+                    <div className="border-b-2 border-dashed pb-6 mb-6">
+                        <div className="flex justify-between items-center">
+                            <h1 className="text-4xl font-bold text-gray-800">BlueRide</h1>
+                            <h2 className="text-2xl font-semibold">Booking Receipt</h2>
+                        </div>
+                        <p className="text-sm text-gray-500">Your reliable water ride.</p>
+                    </div>
+                    <div className="mb-8">
+                        <h3 className="text-lg font-bold mb-2">Trip Details</h3>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                            <div><strong className="font-medium text-gray-600">Passenger:</strong> {user?.displayName}</div>
+                            <div><strong className="font-medium text-gray-600">Booking ID:</strong> {receiptData._id}</div>
+                            <div><strong className="font-medium text-gray-600">Boat Name:</strong> {receiptData.boat?.name}</div>
+                            <div><strong className="font-medium text-gray-600">Date:</strong> {new Date(receiptData.createdAt).toLocaleString()}</div>
+                        </div>
+                    </div>
+                     <div className="mb-8">
+                        <h3 className="text-lg font-bold mb-2">Route Information</h3>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                            <div><strong className="font-medium text-gray-600">From:</strong> {receiptData.pickup}</div>
+                            <div><strong className="font-medium text-gray-600">To:</strong> {receiptData.destination}</div>
+                        </div>
+                    </div>
+                     <div className="mb-8 border-t pt-4">
+                        <h3 className="text-lg font-bold mb-2">Booking Summary</h3>
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                            <div><strong className="font-medium text-gray-600">Type:</strong> {receiptData.bookingType === 'seat' ? 'Seat Booking' : 'Whole Boat Charter'}</div>
+                            {receiptData.seats && <div><strong className="font-medium text-gray-600">Seats:</strong> {receiptData.seats}</div>}
+                            <div><strong className="font-medium text-gray-600">Status:</strong> <span className="font-bold uppercase text-green-600">{receiptData.status}</span></div>
+                        </div>
+                    </div>
+                    <div className="text-center mt-10 border-t-2 border-dashed pt-6">
+                        <p className="font-semibold">Thank you for choosing BlueRide!</p>
+                        <p className="text-sm text-gray-500 mt-2">Please present this receipt upon boarding. Have a safe and pleasant journey.</p>
+                    </div>
+                 </div>
+            )}
+        </div>
     </div>
   );
 }
