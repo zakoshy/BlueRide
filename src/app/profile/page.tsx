@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, Radio, BookCopy, Printer, Ticket } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
@@ -75,6 +75,7 @@ export default function ProfilePage() {
   const [numSeats, setNumSeats] = useState(1);
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [baseFare, setBaseFare] = useState(0);
+  const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState("");
 
   // Bookings History
   const [userBookings, setUserBookings] = useState<Booking[]>([]);
@@ -373,7 +374,7 @@ export default function ProfilePage() {
                            </div>
                         ) : userBookings.length > 0 ? (
                             <div className="space-y-4">
-                                {userBookings.map(booking => (
+                                {paidBookings.map(booking => (
                                     <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
                                         <div>
                                             <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
@@ -391,6 +392,13 @@ export default function ProfilePage() {
                                          </div>
                                     </Card>
                                 ))}
+                                {paidBookings.length === 0 && (
+                                     <div className="text-center py-12">
+                                        <Ticket className="mx-auto h-12 w-12 text-muted-foreground" />
+                                        <h3 className="mt-4 text-lg font-medium">No Paid Bookings</h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">You have no confirmed or completed trips yet.</p>
+                                     </div>
+                                )}
                             </div>
                         ) : (
                              <div className="text-center py-12">
@@ -450,12 +458,43 @@ export default function ProfilePage() {
                     </div>
                     <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
                  </div>
+
+                 <Tabs defaultValue="card" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="card">Card</TabsTrigger>
+                      <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
+                      <TabsTrigger value="paypal">PayPal</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="card">
+                      <div className="space-y-4 rounded-md border bg-card p-4">
+                        <p className="text-center text-muted-foreground">Card payments are coming soon!</p>
+                         <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                            Send Booking Request
+                        </Button>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="mpesa">
+                       <div className="space-y-4 rounded-md border bg-card p-4">
+                          <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
+                          <Input id="mpesa-phone" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
+                           <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0 || !mpesaPhoneNumber}>
+                              Complete Payment
+                          </Button>
+                        </div>
+                    </TabsContent>
+                     <TabsContent value="paypal">
+                       <div className="space-y-4 rounded-md border bg-card p-4">
+                         <p className="text-center text-muted-foreground">PayPal payments are coming soon!</p>
+                           <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                              Send Booking Request
+                          </Button>
+                       </div>
+                    </TabsContent>
+                </Tabs>
+
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setIsBookingDialogOpen(false)}>Cancel</Button>
-               <Button onClick={handleBookingSubmit} className="w-full sm:w-auto" disabled={baseFare <= 0}>
-                Send Booking Request
-              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -506,3 +545,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
