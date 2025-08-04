@@ -6,7 +6,7 @@ import { ObjectId } from 'mongodb';
 // This is a protected route. In a real app, you'd validate the boat owner's or captain's session.
 
 // Constants for revenue split
-const PLATFORM_FEE_PERCENTAGE = 0.15; // 15%
+const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
 const CAPTAIN_COMMISSION_PERCENTAGE = 0.10; // 10%
 
 async function createTripFinancials(booking: any) {
