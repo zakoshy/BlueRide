@@ -56,6 +56,8 @@ export default function ProfilePage() {
   const [numSeats, setNumSeats] = useState(1);
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [fare, setFare] = useState(0);
+  const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState("");
+
 
   useEffect(() => {
     if (!loading && !user) {
@@ -329,8 +331,15 @@ export default function ProfilePage() {
                             <TabsTrigger value="paypal">PayPal</TabsTrigger>
                         </TabsList>
                         <TabsContent value="mpesa" className="mt-4">
-                             <Card className="p-4">
-                                <p className="text-sm text-center text-muted-foreground">An STK push will be sent to your registered phone number to complete the payment.</p>
+                             <Card className="p-4 space-y-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="phone-number">M-Pesa Phone Number</Label>
+                                  <Input id="phone-number" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
+                               </div>
+                               <Button onClick={handleBookingSubmit} className="w-full" disabled={!mpesaPhoneNumber}>
+                                    Complete Payment
+                                </Button>
+                                <p className="text-xs text-center text-muted-foreground">An STK push will be sent to this number.</p>
                             </Card>
                         </TabsContent>
                          <TabsContent value="card" className="mt-4">
@@ -349,12 +358,15 @@ export default function ProfilePage() {
                                     <Input id="cvc" placeholder="•••" />
                                 </div>
                                </div>
+                               <Button onClick={handleBookingSubmit} className="w-full">
+                                    Pay Ksh {fare.toLocaleString()}
+                                </Button>
                              </Card>
                         </TabsContent>
                          <TabsContent value="paypal" className="mt-4">
                              <Card className="p-4 text-center">
                                  <p className="text-sm text-muted-foreground mb-4">You will be redirected to PayPal to complete your payment securely.</p>
-                                <Button variant="outline" className="w-full bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
+                                <Button onClick={handleBookingSubmit} variant="outline" className="w-full bg-blue-600 text-white hover:bg-blue-700 hover:text-white">
                                     <Radio className="mr-2"/> Continue with PayPal
                                 </Button>
                              </Card>
@@ -365,9 +377,6 @@ export default function ProfilePage() {
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setIsBookingDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleBookingSubmit} className="w-full sm:w-auto">
-                Pay Ksh {fare.toLocaleString()} & Confirm Booking
-              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
