@@ -14,7 +14,7 @@ async function createTripFinancials(booking: any) {
 
     // A simple fare calculation logic. This can be made more complex.
     // e.g., base fare + per km/mile rate + per minute rate
-    const fare = booking.bookingType === 'whole_boat' ? 5000 : (booking.seats || 1) * 750;
+    const fare = booking.bookingType === 'whole_boat' ? 2000 : (booking.seats || 1) * 150;
 
     const platformFee = fare * PLATFORM_FEE_PERCENTAGE;
     const captainCommission = (fare - platformFee) * CAPTAIN_COMMISSION_PERCENTAGE;

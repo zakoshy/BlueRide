@@ -159,7 +159,7 @@ export default function ProfilePage() {
   }
   
   const calculateFare = useCallback(() => {
-    const calculatedFare = bookingType === 'whole_boat' ? 5000 : numSeats * 750;
+    const calculatedFare = bookingType === 'whole_boat' ? 2000 : numSeats * 150;
     setFare(calculatedFare);
   }, [bookingType, numSeats]);
 
