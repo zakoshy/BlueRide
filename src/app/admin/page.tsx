@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -322,8 +322,27 @@ export default function AdminPage() {
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Admin'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage users, roles, and boats.</p>
+        <p className="text-muted-foreground mb-8">Manage users, roles, boats, and view platform analytics.</p>
         
+        <div className="mb-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <BarChart3 />
+                        ERP &amp; Analytics
+                    </CardTitle>
+                    <CardDescription>
+                        Access financial data, fleet health, and performance metrics.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button asChild>
+                        <Link href="/erp">Go to ERP Dashboard</Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -333,7 +352,7 @@ export default function AdminPage() {
              <div className="flex gap-2">
                 <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button onClick={() => setRoleToPromote('boat_owner')}><UserPlus className="mr-2 h-4 w-4"/>Promote to Owner</Button>
+                        <Button onClick={() => { setUserToPromote(''); setRoleToPromote('boat_owner'); setPromoteUserDialogOpen(true); }}><UserPlus className="mr-2 h-4 w-4"/>Promote to Owner</Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
@@ -360,9 +379,9 @@ export default function AdminPage() {
                         </form>
                     </DialogContent>
                 </Dialog>
-                 <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
+                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="secondary" onClick={() => setRoleToPromote('captain')}><Anchor className="mr-2 h-4 w-4"/>Promote to Captain</Button>
+                        <Button variant="secondary" onClick={() => { setUserToPromote(''); setRoleToPromote('captain'); }}><Anchor className="mr-2 h-4 w-4"/>Promote to Captain</Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
@@ -371,7 +390,7 @@ export default function AdminPage() {
                                 Select a 'Rider' to promote them to a 'Captain'.
                             </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handlePromoteUser}>
+                        <form onSubmit={(e) => { e.preventDefault(); handleRoleChange(userToPromote, 'captain'); }}>
                             <div className="grid gap-4 py-4">
                                <Label htmlFor="user-to-promote-captain">Select Rider</Label>
                                <Combobox
@@ -521,5 +540,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
