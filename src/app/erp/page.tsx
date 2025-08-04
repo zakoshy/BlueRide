@@ -36,7 +36,7 @@ export default function ErpPage() {
     
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [totalPlatformFee, setTotalPlatformFee] = useState(0);
-    const [totalOwnerPayouts, setTotalOwnerPayouts] = useState(0);
+    const [totalPayouts, setTotalPayouts] = useState(0);
 
 
     const fetchFinancials = useCallback(async () => {
@@ -49,11 +49,11 @@ export default function ErpPage() {
                 // Calculate totals
                 const revenue = data.reduce((acc: number, item: TripFinancials) => acc + item.totalFare, 0);
                 const platformFee = data.reduce((acc: number, item: TripFinancials) => acc + item.platformFee, 0);
-                const ownerPayouts = data.reduce((acc: number, item: TripFinancials) => acc + item.boatOwnerShare, 0);
+                const payouts = data.reduce((acc: number, item: TripFinancials) => acc + item.boatOwnerShare + item.captainCommission, 0);
                 
                 setTotalRevenue(revenue);
                 setTotalPlatformFee(platformFee);
-                setTotalOwnerPayouts(ownerPayouts);
+                setTotalPayouts(payouts);
 
             } else {
                 toast({ title: "Error", description: "Failed to fetch financial data.", variant: "destructive" });
@@ -184,7 +184,7 @@ export default function ErpPage() {
                                                  <CardTitle className="text-sm font-medium flex items-center justify-between">Owner & Captain Payouts <UserCheck/></CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-2 pb-0">
-                                                <div className="text-2xl font-bold">Ksh {totalOwnerPayouts.toLocaleString()}</div>
+                                                <div className="text-2xl font-bold">Ksh {totalPayouts.toLocaleString()}</div>
                                                 <p className="text-xs text-muted-foreground">Total amount due to partners</p>
                                             </CardContent>
                                         </Card>
