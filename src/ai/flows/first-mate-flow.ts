@@ -93,4 +93,7 @@ const briefingPrompt = ai.definePrompt({
 export async function getFirstMateBriefing(input: FirstMateInput): Promise<FirstMateOutput> {
     const { output } = await briefingPrompt(input);
     if (!output) {
-        throw new Error("The AI First
+        throw new Error("The AI First Mate failed to generate a briefing. The model may have returned a null output.");
+    }
+    return output;
+}
