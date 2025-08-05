@@ -48,6 +48,7 @@ export default function CaptainDashboardPage() {
     if (!currentUser) return;
     setLoading(true);
     try {
+        // We now fetch 'completed' trips as they are ready for departure upon payment
         const response = await fetch(`/api/captain/trips?captainId=${currentUser.uid}`);
         if (response.ok) {
             const data = await response.json();
@@ -76,28 +77,6 @@ export default function CaptainDashboardPage() {
       router.push('/profile');
     }
   }, [user, profile, authLoading, router, fetchCaptainTrips]);
-  
-  const handleCompleteTrip = async (bookingId: string) => {
-     try {
-        const response = await fetch('/api/bookings/status', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bookingId, status: 'completed' }),
-        });
-
-        if(response.ok) {
-             toast({ title: "Success", description: `Trip has been marked as completed.` });
-             if (user) fetchCaptainTrips(user);
-        } else {
-             const errorData = await response.json();
-             toast({ title: "Update Failed", description: errorData.message || "Could not update booking.", variant: "destructive" });
-        }
-
-    } catch (error) {
-         console.error("Failed to update booking status", error);
-         toast({ title: "Error", description: "An unexpected error occurred while updating booking.", variant: "destructive" });
-    }
-  };
 
   const handleGetBriefing = async (trip: Booking) => {
     setSelectedTrip(trip);
@@ -163,22 +142,23 @@ export default function CaptainDashboardPage() {
         </div>
     );
   }
-
-  const activeTrips = trips.filter(t => t.status === 'confirmed');
+  
+  // Trips are now auto-completed on payment, so we show them here as ready for departure.
+  const activeTrips = trips.filter(t => t.status === 'completed');
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
       <Header />
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2"><Anchor/> Captain's Dashboard</h1>
-        <p className="text-muted-foreground mb-8">Welcome, {user?.displayName}. Here are your assigned trips and tools.</p>
+        <p className="text-muted-foreground mb-8">Welcome, {user?.displayName}. Here are your assigned trips ready for departure.</p>
         
         <div className="grid grid-cols-1 gap-8">
             <div className="space-y-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Ship/>Active Trips</CardTitle>
-                        <CardDescription>These trips are confirmed and awaiting completion. Get an AI briefing for weather and navigation before you depart.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Ship/>Trips Ready for Departure</CardTitle>
+                        <CardDescription>These trips are paid for and ready to go. Get an AI briefing for weather and navigation before you depart.</CardDescription>
                     </CardHeader>
                     <CardContent>
                        {activeTrips.length > 0 ? (
@@ -195,9 +175,6 @@ export default function CaptainDashboardPage() {
                                             <Button size="sm" onClick={() => handleGetBriefing(trip)}>
                                                 <BrainCircuit className="mr-2"/> Get Briefing
                                             </Button>
-                                            <Button size="sm" variant="secondary" onClick={() => handleCompleteTrip(trip._id)}>
-                                                <CheckSquare className="mr-2"/> Mark Completed
-                                            </Button>
                                         </div>
                                     </Card>
                                 ))}
@@ -205,7 +182,7 @@ export default function CaptainDashboardPage() {
                        ) : (
                          <div className="text-center py-12">
                             <Anchor className="mx-auto h-12 w-12 text-muted-foreground" />
-                            <h3 className="mt-4 text-lg font-medium">No Active Trips</h3>
+                            <h3 className="mt-4 text-lg font-medium">No Trips Assigned</h3>
                             <p className="mt-1 text-sm text-muted-foreground">You have no trips assigned right now. Check back soon!</p>
                          </div>
                        )}

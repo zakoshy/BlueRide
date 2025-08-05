@@ -21,13 +21,36 @@ export async function PUT(request: Request) {
       const db = client.db();
       const bookingsCollection = db.collection('bookings');
   
+      // Can only adjust completed bookings, as this is when the fare is set.
       const result = await bookingsCollection.updateOne(
-        { _id: new ObjectId(bookingId), status: 'confirmed' }, // Can only adjust confirmed bookings
+        { _id: new ObjectId(bookingId), status: 'completed' }, 
         { $set: { finalFare: finalFare, adjustmentPercent: adjustmentPercent } }
       );
   
       if (result.matchedCount === 0) {
         return NextResponse.json({ message: 'Booking not found or not in a state that can be adjusted' }, { status: 404 });
+      }
+      
+      // Since the fare was adjusted, we must also update the financial record
+      const booking = await bookingsCollection.findOne({ _id: new ObjectId(bookingId) });
+      if (booking) {
+         const fare = booking.finalFare;
+         const PLATFORM_FEE_PERCENTAGE = 0.20;
+         const CAPTAIN_COMMISSION_PERCENTAGE = 0.10;
+         const platformFee = fare * PLATFORM_FEE_PERCENTAGE;
+         const captainCommission = (fare - platformFee) * CAPTAIN_COMMISSION_PERCENTAGE;
+         const ownerShare = fare - platformFee - captainCommission;
+
+         await db.collection('trip_financials').updateOne(
+            { bookingId: new ObjectId(bookingId) },
+            { $set: {
+                finalFare: fare,
+                adjustmentPercent: booking.adjustmentPercent,
+                platformFee: platformFee,
+                captainCommission: captainCommission,
+                boatOwnerShare: ownerShare
+            }}
+         );
       }
   
       return NextResponse.json({ message: 'Booking fare adjusted successfully' }, { status: 200 });

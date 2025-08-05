@@ -209,28 +209,6 @@ export default function DashboardPage() {
         toast({ title: "Error", description: "An unexpected error occurred while assigning captain.", variant: "destructive" });
     }
   }
-
-  const handleBookingStatusUpdate = async (bookingId: string, status: 'completed' | 'rejected') => {
-    try {
-        const response = await fetch('/api/bookings/status', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bookingId, status }),
-        });
-
-        if(response.ok) {
-             toast({ title: "Success", description: `Booking has been ${status}.` });
-             if (user) fetchOwnerData(user);
-        } else {
-             const errorData = await response.json();
-             toast({ title: "Update Failed", description: errorData.message || "Could not update booking.", variant: "destructive" });
-        }
-
-    } catch (error) {
-         console.error("Failed to update booking status", error);
-         toast({ title: "Error", description: "An unexpected error occurred while updating booking.", variant: "destructive" });
-    }
-  };
   
   const handleFareAdjustment = async (bookingId: string, baseFare: number) => {
     const adjustmentPercent = currentAdjustments[bookingId] || 0;
@@ -310,8 +288,8 @@ export default function DashboardPage() {
     }
   };
   
-  const activeBookings = bookings.filter(b => b.status === 'confirmed');
-  const pastBookings = bookings.filter(b => ['completed', 'rejected'].includes(b.status));
+  const completedBookings = bookings.filter(b => b.status === 'completed');
+  const pastBookings = bookings.filter(b => b.status === 'rejected');
   const getFinalFare = (baseFare: number, adjustment: number) => baseFare * (1 + adjustment/100);
 
   return (
@@ -320,7 +298,7 @@ export default function DashboardPage() {
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Owner'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage your boats and bookings. All new bookings are auto-confirmed.</p>
+        <p className="text-muted-foreground mb-8">Manage your boats and bookings. All bookings are auto-completed upon payment.</p>
         
         <Tabs defaultValue="bookings">
             <TabsList className="grid w-full grid-cols-2">
@@ -331,13 +309,13 @@ export default function DashboardPage() {
             <TabsContent value="bookings" className="mt-6 space-y-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookOpen/>Active Bookings</CardTitle>
-                        <CardDescription>These trips are confirmed and awaiting completion. You can adjust the final fare or mark them as complete.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><BookOpen/>Completed Trips & Fare Adjustment</CardTitle>
+                        <CardDescription>These trips are completed. You can adjust the final fare for a short period after booking.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                         {activeBookings.length > 0 ? (
+                         {completedBookings.length > 0 ? (
                            <div className="space-y-4">
-                                {activeBookings.map(booking => (
+                                {completedBookings.map(booking => (
                                     <Card key={booking._id} className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                                         <div className="col-span-1">
                                              <div className="font-semibold">{booking.boat?.name || 'N/A'}</div>
@@ -369,13 +347,12 @@ export default function DashboardPage() {
                                         </div>
                                         <div className="col-span-1 flex flex-col items-end gap-2">
                                             <Button size="sm" className="w-full sm:w-auto" onClick={() => handleFareAdjustment(booking._id, booking.baseFare)}>Update Fare</Button>
-                                            <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => handleBookingStatusUpdate(booking._id, 'completed')}><CheckSquare className="mr-2 h-4 w-4"/>Mark as Completed</Button>
                                         </div>
                                     </Card>
                                 ))}
                            </div>
                         ) : (
-                            <p className="text-center text-muted-foreground py-8">You have no active bookings right now.</p>
+                            <p className="text-center text-muted-foreground py-8">You have no completed trips yet.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -384,7 +361,7 @@ export default function DashboardPage() {
                     <CardHeader>
                     <CardTitle className="flex items-center gap-2"><BookOpen/>Booking History</CardTitle>
                     <CardDescription>
-                       This is a log of all your past bookings.
+                       This is a log of all your past bookings, including rejected ones.
                     </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -414,7 +391,7 @@ export default function DashboardPage() {
                                 </TableBody>
                            </Table>
                         ) : (
-                            <p className="text-center text-muted-foreground py-8">You have no booking history yet.</p>
+                            <p className="text-center text-muted-foreground py-8">You have no other booking history yet.</p>
                         )}
                     </CardContent>
                 </Card>

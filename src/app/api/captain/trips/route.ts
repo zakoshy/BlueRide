@@ -24,16 +24,16 @@ export async function GET(request: Request) {
         return NextResponse.json([], { status: 200 }); // No boats, so no trips
     }
 
-    // Find bookings for those boats that are confirmed
+    // Find bookings for those boats that are 'completed' (i.e., paid and ready for departure)
     const bookings = await db.collection('bookings').aggregate([
         {
             $match: { 
                 boatId: { $in: assignedBoatIds },
-                status: 'confirmed'
+                status: 'completed'
             }
         },
         { 
-            $sort: { createdAt: 1 } // Show oldest confirmed first
+            $sort: { createdAt: 1 } // Show oldest trips first
         },
         {
             $lookup: {

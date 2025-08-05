@@ -3,6 +3,47 @@ import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
+// Constants for revenue split
+const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
+const CAPTAIN_COMMISSION_PERCENTAGE = 0.10; // 10%
+
+async function createTripFinancials(booking: any) {
+    if (!booking || !booking.finalFare) return;
+
+    const client = await clientPromise;
+    const db = client.db();
+
+    // The booking is new, so we need to get the boat to find the captain
+    const boat = await db.collection('boats').findOne({ _id: new ObjectId(booking.boatId) });
+
+    const fare = booking.finalFare;
+    const platformFee = fare * PLATFORM_FEE_PERCENTAGE;
+    const captainCommission = (fare - platformFee) * CAPTAIN_COMMISSION_PERCENTAGE;
+    const ownerShare = fare - platformFee - captainCommission;
+
+    const financialData = {
+        bookingId: booking._id,
+        boatId: booking.boatId,
+        ownerId: booking.ownerId,
+        captainId: boat?.captainId || null, // Get captain from boat
+        tripCompletedAt: new Date(),
+        baseFare: booking.baseFare,
+        adjustmentPercent: booking.adjustmentPercent,
+        finalFare: booking.finalFare,
+        platformFee: platformFee,
+        captainCommission: captainCommission,
+        boatOwnerShare: ownerShare,
+    };
+
+    try {
+        await db.collection('trip_financials').insertOne(financialData);
+        console.log(`Financial record created for booking ${booking._id}`);
+    } catch (error) {
+        console.error('Error creating trip financial record:', error);
+    }
+}
+
+
 // POST a new booking
 export async function POST(request: Request) {
   try {
@@ -49,13 +90,18 @@ export async function POST(request: Request) {
       baseFare,
       finalFare: baseFare, // Initially, final fare is the base fare
       adjustmentPercent: 0, // Initially, no adjustment
-      status: 'confirmed', // Auto-confirm bookings
+      status: 'completed', // Auto-complete bookings upon creation/payment
       createdAt: new Date(),
     };
 
     const result = await bookingsCollection.insertOne(newBooking);
+    
+    // Create the financial record immediately
+    const insertedBooking = { ...newBooking, _id: result.insertedId };
+    await createTripFinancials(insertedBooking);
 
-    return NextResponse.json({ message: 'Booking request sent successfully', bookingId: result.insertedId }, { status: 201 });
+
+    return NextResponse.json({ message: 'Booking completed successfully', bookingId: result.insertedId }, { status: 201 });
   } catch (error) {
     console.error('Error creating booking:', error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
@@ -141,6 +187,10 @@ export async function DELETE(request: Request) {
     if (result.deletedCount === 0) {
       return NextResponse.json({ message: 'Booking not found or you do not have permission to delete it' }, { status: 404 });
     }
+    
+    // Also delete associated financial record
+    await db.collection('trip_financials').deleteOne({ bookingId: new ObjectId(bookingId) });
+
 
     return NextResponse.json({ message: 'Booking cancelled successfully' }, { status: 200 });
   } catch (error) {
