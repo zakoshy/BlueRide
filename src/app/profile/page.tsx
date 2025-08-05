@@ -226,19 +226,22 @@ export default function ProfilePage() {
     }
     
     toast({ title: "Calculating fare...", description: "Please wait a moment." });
+    setBaseFare(0); // Reset fare while calculating
+    setSelectedBoat(boat);
 
     try {
       const response = await fetch(`/api/fare?pickup=${encodeURIComponent(pickup)}&destination=${encodeURIComponent(destination)}`);
       if (response.ok) {
         const data = await response.json();
         setBaseFare(data.fare);
-        setSelectedBoat(boat);
         setIsBookingDialogOpen(true);
       } else {
         toast({ title: "Error", description: "Could not calculate fare for this trip.", variant: "destructive" });
+        setSelectedBoat(null);
       }
     } catch (error) {
       toast({ title: "Error", description: "An unexpected error occurred while calculating the fare.", variant: "destructive" });
+      setSelectedBoat(null);
     }
   };
 
@@ -572,3 +575,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
