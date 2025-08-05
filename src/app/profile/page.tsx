@@ -469,7 +469,7 @@ export default function ProfilePage() {
                         <TabsContent value="card">
                         <div className="space-y-4 rounded-md border bg-card p-4">
                              <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                                Book Now (Pay Later)
+                                Book & Pay Later
                             </Button>
                         </div>
                         </TabsContent>
@@ -485,7 +485,7 @@ export default function ProfilePage() {
                         <TabsContent value="paypal">
                         <div className="space-y-4 rounded-md border bg-card p-4">
                              <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                                Book Now (Pay Later)
+                                Book & Pay Later
                             </Button>
                         </div>
                         </TabsContent>
