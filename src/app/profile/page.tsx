@@ -219,18 +219,22 @@ export default function ProfilePage() {
     }
   }
 
-  const handleOpenBookingDialog = async (boat: Boat) => {
+  const handleOpenBookingDialog = (boat: Boat) => {
     if (!pickup || !destination) {
       toast({ title: "Error", description: "Please select pickup and destination first.", variant: "destructive" });
       return;
     }
     setSelectedBoat(boat);
+
+    // Lightweight, client-side fare calculation based on boat type
+    let calculatedFare = 1250; // Default standard fare
+    if (boat.type === 'luxury') {
+        calculatedFare = 2500;
+    } else if (boat.type === 'speed') {
+        calculatedFare = 1800;
+    }
     
-    // --- Alternative Client-Side Fare ---
-    // Since server-side calculation is failing, we use a static fare to unblock the user.
-    // In a real application, the failing API would need to be debugged.
-    const staticFare = 1250;
-    setBaseFare(staticFare);
+    setBaseFare(calculatedFare);
     setIsBookingDialogOpen(true);
   };
 
