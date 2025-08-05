@@ -71,6 +71,7 @@ export async function GET(request: Request) {
                     uid: "$riderInfo.uid"
                 },
                 boat: {
+                    _id: "$boatInfo._id",
                     name: "$boatInfo.name",
                     licenseNumber: "$boatInfo.licenseNumber"
                 }

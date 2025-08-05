@@ -23,7 +23,7 @@ interface Booking {
     destination: string;
     status: 'confirmed' | 'completed' | 'rejected';
     rider: { name: string, uid: string };
-    boat: { name: string, licenseNumber: string };
+    boat: { name: string, licenseNumber: string, _id: string };
     seats?: number;
     bookingType: 'seat' | 'whole_boat';
     createdAt: string;
@@ -218,7 +218,7 @@ export default function CaptainDashboardPage() {
                 </div>
             </div>
           )}
-          {briefing && !isBriefingLoading && (
+          {briefing && !isBriefingLoading && selectedTrip && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                 <div className="space-y-4">
                     <Card>
@@ -247,6 +247,7 @@ export default function CaptainDashboardPage() {
                             apiKey={googleMapsApiKey}
                             pickup={briefing.route.pickup}
                             destination={briefing.route.destination}
+                            boatId={selectedTrip.boat._id}
                          />
                     </div>
                 </div>
