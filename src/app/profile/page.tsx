@@ -97,6 +97,13 @@ export default function ProfilePage() {
     content: () => receiptRef.current,
   });
 
+   const handleViewReceipt = (booking: Booking) => {
+    setReceiptData(booking);
+    setTimeout(() => {
+        handlePrint();
+    }, 100);
+  };
+
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
@@ -236,13 +243,6 @@ export default function ProfilePage() {
     setBaseFare(calculatedFare);
     setSelectedBoat(boat);
     setIsBookingDialogOpen(true);
-  };
-
-  const handleViewReceipt = (booking: Booking) => {
-    setReceiptData(booking);
-    setTimeout(() => {
-        handlePrint();
-    }, 100);
   };
 
   const handleCancelBooking = async (bookingId: string) => {
@@ -418,25 +418,25 @@ export default function ProfilePage() {
                                                     <span className="sr-only">View Receipt</span>
                                                 </Button>
                                              )}
-                                            {booking.status === 'confirmed' && (
+                                            {(booking.status === 'confirmed' || booking.status === 'rejected') && (
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button variant="destructive" size="icon">
                                                         <Trash2 className="h-4 w-4" />
-                                                        <span className="sr-only">Cancel Booking</span>
+                                                        <span className="sr-only">{booking.status === 'confirmed' ? 'Cancel Booking' : 'Delete Booking'}</span>
                                                     </Button>
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader>
                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                     <AlertDialogDescription>
-                                                        This action cannot be undone. This will permanently cancel your booking.
+                                                        This action cannot be undone. This will permanently remove this booking.
                                                     </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
                                                     <AlertDialogCancel>Go Back</AlertDialogCancel>
                                                     <AlertDialogAction onClick={() => handleCancelBooking(booking._id)}>
-                                                        Yes, Cancel Booking
+                                                        Yes, Proceed
                                                     </AlertDialogAction>
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
