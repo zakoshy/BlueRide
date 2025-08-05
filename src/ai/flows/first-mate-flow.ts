@@ -14,7 +14,7 @@ import clientPromise from '@/lib/mongodb';
 
 
 // Input Schema
-const FirstMateInputSchema = z.object({
+export const FirstMateInputSchema = z.object({
   pickup: z.string().describe('The name of the pickup location.'),
   destination: z.string().describe('The name of the destination location.'),
 });
@@ -37,7 +37,7 @@ const WeatherSchema = z.object({
     visibility: z.string().describe("Visibility, e.g., 'Clear, 10+ nautical miles'.")
 });
 
-const FirstMateOutputSchema = z.object({
+export const FirstMateOutputSchema = z.object({
   route: RouteSchema.describe("The latitude and longitude for the trip's start and end points."),
   weather: WeatherSchema.describe("A realistic marine weather forecast for the area."),
   advice: z.string().describe("Concise, helpful navigation advice for the captain based on the route and weather. Mention any potential hazards or points of interest.")
