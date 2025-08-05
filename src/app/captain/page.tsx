@@ -43,6 +43,13 @@ export default function CaptainDashboardPage() {
   const [selectedTrip, setSelectedTrip] = useState<Booking | null>(null);
   const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
   const [isBriefingLoading, setBriefingLoading] = useState(false);
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState('');
+
+
+  useEffect(() => {
+    // This is the correct way to access environment variables on the client-side in Next.js
+    setGoogleMapsApiKey(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '');
+  }, []);
 
 
   const fetchCaptainTrips = useCallback(async (currentUser: FirebaseUser) => {
@@ -240,7 +247,7 @@ export default function CaptainDashboardPage() {
                             fill
                             style={{ objectFit: 'cover' }}
                             alt="Route map"
-                            src={`https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=color:0x0000ff|weight:5|${briefing.route.pickup.lat},${briefing.route.pickup.lng}|${briefing.route.destination.lat},${briefing.route.destination.lng}&markers=color:green|label:A|${briefing.route.pickup.lat},${briefing.route.pickup.lng}&markers=color:red|label:B|${briefing.route.destination.lat},${briefing.route.destination.lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
+                            src={`https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=color:0x0000ff|weight:5|${briefing.route.pickup.lat},${briefing.route.pickup.lng}|${briefing.route.destination.lat},${briefing.route.destination.lng}&markers=color:green|label:A|${briefing.route.pickup.lat},${briefing.route.pickup.lng}&markers=color:red|label:B|${briefing.route.destination.lat},${briefing.route.destination.lng}&key=${googleMapsApiKey}`}
                         />
                     </div>
                 </div>
