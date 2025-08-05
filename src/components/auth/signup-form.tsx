@@ -34,6 +34,8 @@ export function SignupForm() {
   const { toast } = useToast()
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -73,6 +75,7 @@ export function SignupForm() {
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
+    setIsSubmitting(true);
     try {
       const result = await signInWithPopup(auth, provider);
       await saveUserToDb(result.user);
@@ -87,10 +90,13 @@ export function SignupForm() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsSubmitting(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
       const user = userCredential.user;
@@ -111,29 +117,13 @@ export function SignupForm() {
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
        if (error.code === 'auth/email-already-in-use') {
-            // This case handles when a user exists in Firebase Auth but maybe not in our DB (e.g., deleted from DB).
-            // We can try to log them in and create their DB profile.
-            description = "This email is already registered. Attempting to log you in instead.";
+           description = "This email is already registered. Please log in.";
             toast({
                 title: "Existing Account",
                 description: description,
+                variant: "destructive",
             });
-            try {
-                const loginCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-                await saveUserToDb({
-                    uid: loginCredential.user.uid,
-                    email: loginCredential.user.email,
-                    displayName: values.name, // Use the new name they provided
-                });
-                await updateProfile(loginCredential.user, { displayName: values.name });
-                router.push('/profile');
-            } catch (loginError: any) {
-                 toast({
-                    title: "Login Failed",
-                    description: "We found an account with this email, but the password was incorrect.",
-                    variant: "destructive",
-                });
-            }
+            router.push('/login');
        } else if (error.code) {
            description = error.message;
             toast({
@@ -142,13 +132,15 @@ export function SignupForm() {
                 variant: "destructive",
             });
        }
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
   return (
     <Form {...form}>
       <CardContent className="space-y-4 pt-6">
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSubmitting}>
             <Chrome className="mr-2 h-4 w-4" />
             Sign up with Google
           </Button>
@@ -214,8 +206,8 @@ export function SignupForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Creating Account..." : "Create Account"}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Creating Account..." : "Create Account"}
           </Button>
       </form>
       </CardContent>

@@ -45,55 +45,6 @@ export function LoginForm() {
     },
   })
 
-  const handleSuccessfulLogin = async (user: User) => {
-    try {
-        // Manually refetch the profile to get the latest user role
-        await refetchProfile();
-        const response = await fetch(`/api/users/${user.uid}`);
-        
-        let profile;
-        if (response.ok) {
-           profile = await response.json();
-        } else {
-             console.error("Failed to fetch user profile after login, but login was successful.");
-             toast({
-                title: "Login Warning",
-                description: "Could not retrieve your user profile. Please try again later.",
-                variant: "destructive",
-            });
-        }
-
-        toast({
-            title: "Login Successful",
-            description: "Welcome back!",
-        });
-
-        // Redirect based on role
-        if (profile?.role === 'admin') {
-            router.push('/admin');
-        } else if (profile?.role === 'boat_owner') {
-            router.push('/dashboard');
-        } else if (profile?.role === 'captain') {
-            router.push('/captain');
-        } else {
-            router.push('/profile');
-        }
-
-    } catch (error) {
-        console.error("Failed to fetch user profile for redirection", error);
-        toast({
-            title: "Error",
-            description: "An unexpected error occurred after login. Redirecting to your profile.",
-            variant: "destructive",
-        });
-        // Still redirect to a default page even if the fetch fails
-        router.push('/profile');
-    } finally {
-        setIsSubmitting(false);
-    }
-  }
-
-
   const saveUserToDb = async (user: { uid: string; email: string | null; displayName: string | null; }) => {
     try {
       const response = await fetch('/api/users', {
@@ -130,7 +81,8 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       await saveUserToDb(result.user);
-      await handleSuccessfulLogin(result.user);
+      toast({ title: "Login Successful", description: "Welcome back!" });
+      router.push('/profile');
     } catch (error: any) {
       let description = "An unknown error occurred during Google sign-in.";
       if (error.code) {
@@ -141,15 +93,17 @@ export function LoginForm() {
         description: description,
         variant: "destructive",
       });
-      setIsSubmitting(false);
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-      await handleSuccessfulLogin(userCredential.user);
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      toast({ title: "Login Successful", description: "Welcome back!" });
+      router.push('/profile');
     } catch (error: any) {
        let description = "An unexpected error occurred. Please try again.";
        if (error.code === 'auth/invalid-credential') {
@@ -162,7 +116,8 @@ export function LoginForm() {
         description: description,
         variant: "destructive",
       })
-      setIsSubmitting(false);
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
