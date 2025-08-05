@@ -49,8 +49,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refetchProfile = useCallback(async () => {
-    await fetchProfile(user);
-  }, [user, fetchProfile]);
+    // This function will be exposed by the context to allow manual refetching.
+    // It gets the currently authenticated user directly from the auth state.
+    const currentUser = auth.currentUser;
+    await fetchProfile(currentUser);
+  }, [fetchProfile]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -71,5 +75,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-
-    

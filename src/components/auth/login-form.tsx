@@ -81,6 +81,7 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       await saveUserToDb(result.user);
+      await refetchProfile();
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/profile');
     } catch (error: any) {
@@ -102,6 +103,7 @@ export function LoginForm() {
     setIsSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
+      await refetchProfile();
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/profile');
     } catch (error: any) {
