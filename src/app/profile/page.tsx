@@ -8,17 +8,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReactToPrint } from 'react-to-print';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
 // Define types for our data structures
@@ -56,7 +57,10 @@ interface Booking {
   seats?: number;
   baseFare: number;
   finalFare?: number;
-  boat?: { name: string };
+  boat?: { 
+    name: string;
+    capacity: number;
+ };
 }
 
 type PaymentMethod = 'card' | 'mpesa' | 'paypal';
@@ -235,15 +239,38 @@ export default function ProfilePage() {
     setSelectedBoat(boat);
     setIsBookingDialogOpen(true);
   };
-
+  
+  useEffect(() => {
+    if (receiptData) {
+      setTimeout(() => {
+        handlePrint();
+      }, 100);
+    }
+  }, [receiptData, handlePrint]);
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
-    // Use a timeout to allow React to render the receipt data before printing
-    setTimeout(() => {
-      handlePrint();
-    }, 100);
   };
+  
+  const handleCancelBooking = async (bookingId: string) => {
+    if (!user) return;
+    try {
+        const response = await fetch(`/api/bookings?bookingId=${bookingId}&riderId=${user.uid}`, {
+            method: 'DELETE',
+        });
+
+        if (response.ok) {
+            toast({ title: "Booking Cancelled", description: "Your booking has been successfully cancelled." });
+            fetchUserBookings(); // Refresh the list
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Cancellation Failed", description: errorData.message || "Could not cancel booking.", variant: "destructive" });
+        }
+    } catch (error) {
+        toast({ title: "Error", description: "An unexpected error occurred while cancelling the booking.", variant: "destructive" });
+    }
+  };
+
 
   if (loading || !user) {
     return (
@@ -378,31 +405,54 @@ export default function ProfilePage() {
                            </div>
                         ) : userBookings.length > 0 ? (
                             <div className="space-y-4">
-                                {paidBookings.map(booking => (
+                                {userBookings.map(booking => (
                                     <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
                                         <div>
                                             <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
                                             <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
                                             <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
                                             {booking.finalFare && <p className="text-xs font-bold">Fare: Ksh {booking.finalFare.toLocaleString()}</p>}
+                                             {booking.bookingType === 'seat' && booking.boat?.capacity && (
+                                                <p className="text-xs text-muted-foreground">
+                                                   Seats remaining: {booking.boat.capacity - (booking.seats ?? 0)}
+                                                </p>
+                                            )}
                                         </div>
                                          <div className="flex items-center gap-2 self-end sm:self-center">
                                             <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
                                              {(booking.status === 'confirmed' || booking.status === 'completed') && (
-                                                <Button variant="outline" size="sm" onClick={() => handleViewReceipt(booking)}>
-                                                    <Printer className="mr-2 h-4 w-4"/> View Receipt
+                                                <Button variant="outline" size="icon" onClick={() => handleViewReceipt(booking)}>
+                                                    <Printer className="h-4 w-4"/>
+                                                    <span className="sr-only">View Receipt</span>
                                                 </Button>
                                              )}
+                                            {booking.status === 'confirmed' && (
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="icon">
+                                                        <Trash2 className="h-4 w-4" />
+                                                        <span className="sr-only">Cancel Booking</span>
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This action cannot be undone. This will permanently cancel your booking.
+                                                    </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                    <AlertDialogCancel>Go Back</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleCancelBooking(booking._id)}>
+                                                        Yes, Cancel Booking
+                                                    </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                            )}
                                          </div>
                                     </Card>
                                 ))}
-                                {paidBookings.length === 0 && (
-                                     <div className="text-center py-12">
-                                        <Ticket className="mx-auto h-12 w-12 text-muted-foreground" />
-                                        <h3 className="mt-4 text-lg font-medium">No Paid Bookings</h3>
-                                        <p className="mt-1 text-sm text-muted-foreground">You have no confirmed or completed trips yet.</p>
-                                     </div>
-                                )}
                             </div>
                         ) : (
                              <div className="text-center py-12">
@@ -567,4 +617,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

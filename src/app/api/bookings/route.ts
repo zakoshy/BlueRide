@@ -97,7 +97,10 @@ export async function GET(request: Request) {
                     seats: 1,
                     baseFare: 1,
                     finalFare: 1,
-                    boat: { name: '$boatInfo.name' }
+                    boat: { 
+                        name: '$boatInfo.name',
+                        capacity: '$boatInfo.capacity'
+                    }
                 }
             }
         ]).toArray();
@@ -108,4 +111,40 @@ export async function GET(request: Request) {
         console.error('Error fetching rider bookings:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
+}
+
+// DELETE a booking
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const bookingId = searchParams.get('bookingId');
+    const riderId = searchParams.get('riderId'); // For validation
+
+    if (!bookingId || !riderId) {
+      return NextResponse.json({ message: 'Booking ID and Rider ID are required' }, { status: 400 });
+    }
+
+    if (!ObjectId.isValid(bookingId)) {
+      return NextResponse.json({ message: 'Invalid Booking ID' }, { status: 400 });
+    }
+
+    const client = await clientPromise;
+    const db = client.db();
+    const bookingsCollection = db.collection('bookings');
+
+    // To ensure a user can only delete their own booking, we match both id and riderId
+    const result = await bookingsCollection.deleteOne({
+      _id: new ObjectId(bookingId),
+      riderId: riderId,
+    });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ message: 'Booking not found or you do not have permission to delete it' }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: 'Booking cancelled successfully' }, { status: 200 });
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+  }
 }
