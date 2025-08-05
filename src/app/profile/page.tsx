@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +59,9 @@ interface Booking {
   boat?: { name: string };
 }
 
+type PaymentMethod = 'card' | 'mpesa' | 'paypal';
+
+
 export default function ProfilePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -77,6 +80,8 @@ export default function ProfilePage() {
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [baseFare, setBaseFare] = useState(0);
   const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState("");
+  const [activePaymentMethod, setActivePaymentMethod] = useState<PaymentMethod>('mpesa');
+
 
   // Bookings History
   const [userBookings, setUserBookings] = useState<Booking[]>([]);
@@ -191,7 +196,14 @@ export default function ProfilePage() {
         });
 
         if (response.ok) {
-            toast({ title: "Booking Confirmed!", description: "Your trip is confirmed. Check 'My Bookings' for details and your receipt." });
+            let toastMessage = "Your trip is confirmed. Check 'My Bookings' for details and your receipt.";
+            if (activePaymentMethod === 'card') {
+                toastMessage = "Booking Confirmed! Your Card has been authorized.";
+            } else if (activePaymentMethod === 'paypal') {
+                toastMessage = "Booking Confirmed via PayPal!";
+            }
+            toast({ title: "Booking Confirmed!", description: toastMessage });
+            
             setIsBookingDialogOpen(false);
             setSelectedBoat(null);
             setBoats([]);
@@ -460,34 +472,49 @@ export default function ProfilePage() {
                         <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
                     </div>
 
-                    <Tabs defaultValue="mpesa" className="w-full">
+                    <Tabs defaultValue="mpesa" className="w-full" onValueChange={(v) => setActivePaymentMethod(v as PaymentMethod)}>
                         <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="card">Card</TabsTrigger>
-                        <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
-                        <TabsTrigger value="paypal">PayPal</TabsTrigger>
+                            <TabsTrigger value="card">Card</TabsTrigger>
+                            <TabsTrigger value="mpesa">M-Pesa</TabsTrigger>
+                            <TabsTrigger value="paypal">PayPal</TabsTrigger>
                         </TabsList>
                         <TabsContent value="card">
-                        <div className="space-y-4 rounded-md border bg-card p-4">
-                             <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                                Book & Pay Later
-                            </Button>
-                        </div>
+                            <div className="space-y-4 rounded-md border bg-card p-4">
+                               <div className="space-y-2">
+                                    <Label htmlFor="card-number">Card Number</Label>
+                                    <Input id="card-number" placeholder="0000 0000 0000 0000"/>
+                               </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                     <div className="space-y-2">
+                                        <Label htmlFor="expiry">Expiry</Label>
+                                        <Input id="expiry" placeholder="MM/YY"/>
+                                     </div>
+                                      <div className="space-y-2">
+                                        <Label htmlFor="cvc">CVC</Label>
+                                        <Input id="cvc" placeholder="123"/>
+                                     </div>
+                                </div>
+                                <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                                    Complete Payment
+                                </Button>
+                            </div>
                         </TabsContent>
                         <TabsContent value="mpesa">
-                        <div className="space-y-4 rounded-md border bg-card p-4">
-                            <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
-                            <Input id="mpesa-phone" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
-                            <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0 || !mpesaPhoneNumber}>
-                                Complete Payment
-                            </Button>
+                            <div className="space-y-4 rounded-md border bg-card p-4">
+                                <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
+                                <Input id="mpesa-phone" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
+                                <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0 || !mpesaPhoneNumber}>
+                                    Complete Payment
+                                </Button>
                             </div>
                         </TabsContent>
                         <TabsContent value="paypal">
-                        <div className="space-y-4 rounded-md border bg-card p-4">
-                             <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                                Book & Pay Later
-                            </Button>
-                        </div>
+                            <div className="space-y-4 rounded-md border bg-card p-4 text-center">
+                               <p className="text-sm text-muted-foreground">You will be redirected to PayPal to complete your purchase securely.</p>
+                               <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                                   <Bot className="mr-2 h-4 w-4"/> Continue with PayPal
+                                </Button>
+                            </div>
                         </TabsContent>
                     </Tabs>
 
@@ -545,3 +572,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
