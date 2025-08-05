@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { User as FirebaseUser } from "firebase/auth";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { getFirstMateBriefing, type FirstMateInput, type FirstMateOutput } from "@/ai/flows/first-mate-flow";
+import Image from "next/image";
 
 interface Booking {
     _id: string;
@@ -234,15 +235,13 @@ export default function CaptainDashboardPage() {
                 </div>
                 <div className="space-y-4">
                     <h3 className="font-semibold text-center">Route Map</h3>
-                    <div className="aspect-video w-full rounded-md border overflow-hidden">
-                        <iframe
-                            width="100%"
-                            height="100%"
-                            style={{ border: 0 }}
-                            loading="lazy"
-                            allowFullScreen
-                            src={`https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&origin=${briefing.route.pickup.lat},${briefing.route.pickup.lng}&destination=${briefing.route.destination.lat},${briefing.route.destination.lng}&mode=driving`}>
-                        </iframe>
+                    <div className="aspect-video w-full rounded-md border overflow-hidden relative">
+                         <Image
+                            fill
+                            style={{ objectFit: 'cover' }}
+                            alt="Route map"
+                            src={`https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=color:0x0000ff|weight:5|${briefing.route.pickup.lat},${briefing.route.pickup.lng}|${briefing.route.destination.lat},${briefing.route.destination.lng}&markers=color:green|label:A|${briefing.route.pickup.lat},${briefing.route.pickup.lng}&markers=color:red|label:B|${briefing.route.destination.lat},${briefing.route.destination.lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
+                        />
                     </div>
                 </div>
             </div>
