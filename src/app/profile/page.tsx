@@ -96,15 +96,6 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (receiptData) {
-      setTimeout(() => {
-        handlePrint();
-      }, 100);
-    }
-  }, [receiptData, handlePrint]);
-
-
-  useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
@@ -248,6 +239,10 @@ export default function ProfilePage() {
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
+    // Use a timeout to allow React to render the receipt data before printing
+    setTimeout(() => {
+      handlePrint();
+    }, 100);
   };
 
   if (loading || !user) {
