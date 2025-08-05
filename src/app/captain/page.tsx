@@ -6,14 +6,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertCircle, Anchor, Ship, User, Map, CloudSun, CheckSquare } from "lucide-react";
+import { ArrowLeft, AlertCircle, Anchor, Ship, User, Map, CloudSun, CheckSquare, BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
 import type { User as FirebaseUser } from "firebase/auth";
-import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { getFirstMateBriefing, type FirstMateInput, type FirstMateOutput } from "@/ai/flows/first-mate-flow";
 
 interface Booking {
     _id: string;
@@ -27,6 +28,7 @@ interface Booking {
     createdAt: string;
 }
 
+
 export default function CaptainDashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -35,6 +37,12 @@ export default function CaptainDashboardPage() {
   const [isCaptain, setIsCaptain] = useState(false);
   const [loading, setLoading] = useState(true);
   const [trips, setTrips] = useState<Booking[]>([]);
+  
+  const [isBriefingDialogOpen, setBriefingDialogOpen] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<Booking | null>(null);
+  const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
+  const [isBriefingLoading, setBriefingLoading] = useState(false);
+
 
   const fetchCaptainTrips = useCallback(async (currentUser: FirebaseUser) => {
     if (!currentUser) return;
@@ -91,6 +99,27 @@ export default function CaptainDashboardPage() {
     }
   };
 
+  const handleGetBriefing = async (trip: Booking) => {
+    setSelectedTrip(trip);
+    setBriefingDialogOpen(true);
+    setBriefingLoading(true);
+    setBriefing(null);
+    try {
+        const input: FirstMateInput = {
+            pickup: trip.pickup,
+            destination: trip.destination,
+        };
+        const briefingData = await getFirstMateBriefing(input);
+        setBriefing(briefingData);
+    } catch (error) {
+        console.error("Failed to get AI briefing", error);
+        toast({ title: "Briefing Error", description: "Could not retrieve AI briefing for this trip.", variant: "destructive"});
+        setBriefingDialogOpen(false);
+    } finally {
+        setBriefingLoading(false);
+    }
+  }
+
 
   if (loading || authLoading) {
     return (
@@ -144,27 +173,32 @@ export default function CaptainDashboardPage() {
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2"><Anchor/> Captain's Dashboard</h1>
         <p className="text-muted-foreground mb-8">Welcome, {user?.displayName}. Here are your assigned trips and tools.</p>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
+        <div className="grid grid-cols-1 gap-8">
+            <div className="space-y-8">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Ship/>Active Trips</CardTitle>
-                        <CardDescription>These trips are confirmed and awaiting completion.</CardDescription>
+                        <CardDescription>These trips are confirmed and awaiting completion. Get an AI briefing for weather and navigation before you depart.</CardDescription>
                     </CardHeader>
                     <CardContent>
                        {activeTrips.length > 0 ? (
                             <div className="space-y-4">
                                 {activeTrips.map(trip => (
-                                    <Card key={trip._id} className="p-4 flex flex-col sm:flex-row justify-between items-start gap-4">
-                                        <div>
+                                    <Card key={trip._id} className="p-4 grid grid-cols-1 md:grid-cols-3 items-center gap-4">
+                                        <div className="md:col-span-2">
                                             <p className="font-semibold text-primary">{trip.pickup} to {trip.destination}</p>
                                             <p className="text-sm text-muted-foreground">Rider: {trip.rider.name}</p>
                                             <p className="text-sm text-muted-foreground">Vessel: {trip.boat.name} ({trip.boat.licenseNumber})</p>
                                             <p className="text-xs text-muted-foreground">{trip.bookingType === 'seat' ? `${trip.seats} seat(s)` : 'Whole boat charter'}</p>
                                         </div>
-                                        <Button size="sm" onClick={() => handleCompleteTrip(trip._id)}>
-                                            <CheckSquare className="mr-2"/> Mark Completed
-                                        </Button>
+                                        <div className="flex flex-col gap-2">
+                                            <Button size="sm" onClick={() => handleGetBriefing(trip)}>
+                                                <BrainCircuit className="mr-2"/> Get Briefing
+                                            </Button>
+                                            <Button size="sm" variant="secondary" onClick={() => handleCompleteTrip(trip._id)}>
+                                                <CheckSquare className="mr-2"/> Mark Completed
+                                            </Button>
+                                        </div>
                                     </Card>
                                 ))}
                             </div>
@@ -178,31 +212,66 @@ export default function CaptainDashboardPage() {
                     </CardContent>
                 </Card>
             </div>
-            
-            <div className="lg:col-span-1 space-y-8">
-                <Card className="bg-blue-50 border-blue-200">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Map/> Live Map</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                         <Map className="mx-auto h-16 w-16 text-blue-400 mb-4" />
-                         <p className="text-muted-foreground text-sm">Real-time navigation and trip tracking will be available here.</p>
-                         <Button variant="secondary" className="mt-4" disabled>Coming Soon</Button>
-                    </CardContent>
-                </Card>
-                 <Card className="bg-yellow-50 border-yellow-200">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><CloudSun/> Weather Forecast</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                         <CloudSun className="mx-auto h-16 w-16 text-yellow-400 mb-4" />
-                         <p className="text-muted-foreground text-sm">Live weather alerts and sea conditions will be shown here for safety.</p>
-                         <Button variant="secondary" className="mt-4" disabled>Coming Soon</Button>
-                    </CardContent>
-                </Card>
-            </div>
         </div>
       </main>
+
+       <Dialog open={isBriefingDialogOpen} onOpenChange={setBriefingDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>First Mate Briefing: {selectedTrip?.pickup} to {selectedTrip?.destination}</DialogTitle>
+            <DialogDescription>
+              AI-powered trip analysis for your safety and efficiency.
+            </DialogDescription>
+          </DialogHeader>
+          {isBriefingLoading && (
+             <div className="space-y-4 py-8">
+                <Skeleton className="h-8 w-3/4 mx-auto" />
+                <Skeleton className="h-4 w-1/2 mx-auto" />
+                <div className="flex justify-center items-center gap-2 text-muted-foreground">
+                    <BrainCircuit className="h-5 w-5 animate-pulse" />
+                    <p>Your AI First Mate is analyzing the route and weather...</p>
+                </div>
+            </div>
+          )}
+          {briefing && !isBriefingLoading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div className="space-y-4">
+                    <Card>
+                        <CardHeader className="pb-2">
+                             <CardTitle className="text-lg flex items-center gap-2"><CloudSun /> Marine Forecast</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-1">
+                            <p><span className="font-semibold">Wind:</span> {briefing.weather.wind}</p>
+                            <p><span className="font-semibold">Waves:</span> {briefing.weather.waves}</p>
+                            <p><span className="font-semibold">Visibility:</span> {briefing.weather.visibility}</p>
+                        </CardContent>
+                    </Card>
+                     <Card>
+                        <CardHeader className="pb-2">
+                             <CardTitle className="text-lg flex items-center gap-2"><Anchor /> Navigation Advice</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">{briefing.advice}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="space-y-4">
+                    <h3 className="font-semibold text-center">Route Map</h3>
+                    <div className="aspect-video w-full rounded-md border overflow-hidden">
+                        <iframe
+                            width="100%"
+                            height="100%"
+                            style={{ border: 0 }}
+                            loading="lazy"
+                            allowFullScreen
+                            src={`https://www.google.com/maps/embed/v1/directions?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&origin=${briefing.route.pickup.lat},${briefing.route.pickup.lng}&destination=${briefing.route.destination.lat},${briefing.route.destination.lng}&mode=driving`}>
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
