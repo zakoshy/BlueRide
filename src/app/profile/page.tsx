@@ -87,11 +87,12 @@ export default function ProfilePage() {
   const [userBookings, setUserBookings] = useState<Booking[]>([]);
   const [isFetchingBookings, setIsFetchingBookings] = useState(false);
   const [receiptData, setReceiptData] = useState<Booking | null>(null);
-  const receiptRef = useRef(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
     documentTitle: `BlueRide-Receipt-${receiptData?._id}`,
+    onAfterPrint: () => setReceiptData(null), // Clear receipt data after printing
   });
 
 
@@ -138,6 +139,12 @@ export default function ProfilePage() {
     fetchLocations();
     fetchUserBookings();
   }, [toast, fetchUserBookings]);
+  
+   useEffect(() => {
+    if (receiptData) {
+      handlePrint();
+    }
+  }, [receiptData, handlePrint]);
   
   const handleFindBoat = useCallback(async () => {
     if (!pickup || !destination) {
@@ -201,7 +208,10 @@ export default function ProfilePage() {
                 toastMessage = "Booking Confirmed! Your Card has been authorized.";
             } else if (activePaymentMethod === 'paypal') {
                 toastMessage = "Booking Confirmed via PayPal!";
+            } else {
+                 toastMessage = `Booking Confirmed! A request will be sent to ${mpesaPhoneNumber} to complete payment.`
             }
+
             toast({ title: "Booking Confirmed!", description: toastMessage });
             
             setIsBookingDialogOpen(false);
@@ -241,9 +251,6 @@ export default function ProfilePage() {
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
-    setTimeout(() => {
-        handlePrint();
-    }, 100);
   };
 
   if (loading || !user) {
@@ -568,5 +575,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
