@@ -97,7 +97,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (receiptData) {
-      handlePrint();
+      setTimeout(() => {
+        handlePrint();
+      }, 100);
     }
   }, [receiptData, handlePrint]);
 
@@ -571,4 +573,3 @@ export default function ProfilePage() {
   );
 }
 
-    
