@@ -14,7 +14,7 @@ import clientPromise from '@/lib/mongodb';
 
 
 // Input Schema
-export const FirstMateInputSchema = z.object({
+const FirstMateInputSchema = z.object({
   pickup: z.string().describe('The name of the pickup location.'),
   destination: z.string().describe('The name of the destination location.'),
 });
@@ -37,7 +37,7 @@ const WeatherSchema = z.object({
     visibility: z.string().describe("Visibility, e.g., 'Clear, 10+ nautical miles'.")
 });
 
-export const FirstMateOutputSchema = z.object({
+const FirstMateOutputSchema = z.object({
   route: RouteSchema.describe("The latitude and longitude for the trip's start and end points."),
   weather: WeatherSchema.describe("A realistic marine weather forecast for the area."),
   advice: z.string().describe("Concise, helpful navigation advice for the captain based on the route and weather. Mention any potential hazards or points of interest.")
@@ -89,11 +89,22 @@ const briefingPrompt = ai.definePrompt({
     `,
 });
 
+const briefingFlow = ai.defineFlow(
+    {
+        name: 'firstMateBriefingFlow',
+        inputSchema: FirstMateInputSchema,
+        outputSchema: FirstMateOutputSchema,
+    },
+    async (input) => {
+        const { output } = await briefingPrompt(input);
+        if (!output) {
+            throw new Error("The AI First Mate failed to generate a briefing. The model may have returned a null output.");
+        }
+        return output;
+    }
+);
+
 // Main exported flow function
 export async function getFirstMateBriefing(input: FirstMateInput): Promise<FirstMateOutput> {
-    const { output } = await briefingPrompt(input);
-    if (!output) {
-        throw new Error("The AI First Mate failed to generate a briefing. The model may have returned a null output.");
-    }
-    return output;
+    return briefingFlow(input);
 }
