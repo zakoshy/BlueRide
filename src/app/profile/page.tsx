@@ -281,8 +281,7 @@ export default function ProfilePage() {
        </div>
     )
   }
-
-  const paidBookings = userBookings.filter(b => b.status === 'confirmed' || b.status === 'completed');
+  
   const statusVariant = (status: Booking['status']) => {
     switch (status) {
         case 'confirmed': return 'default';
