@@ -57,7 +57,7 @@ interface Booking {
   seats?: number;
   baseFare: number;
   finalFare?: number;
-  boat?: { 
+  boat?: {
     name: string;
     capacity: number;
  };
@@ -95,8 +95,6 @@ export default function ProfilePage() {
 
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
-    documentTitle: `BlueRide-Receipt-${receiptData?._id}`,
-    onAfterPrint: () => setReceiptData(null),
   });
 
   useEffect(() => {
@@ -142,7 +140,7 @@ export default function ProfilePage() {
     fetchLocations();
     fetchUserBookings();
   }, [toast, fetchUserBookings]);
-  
+
   const handleFindBoat = useCallback(async () => {
     if (!pickup || !destination) {
       toast({ title: "Missing Information", description: "Please select both a pickup and destination.", variant: "destructive" });
@@ -181,7 +179,7 @@ export default function ProfilePage() {
         toast({ title: "Error", description: "Missing required information for booking.", variant: "destructive"});
         return;
     }
-    
+
     const bookingDetails = {
         boatId: selectedBoat._id,
         riderId: user.uid,
@@ -210,7 +208,7 @@ export default function ProfilePage() {
             }
 
             toast({ title: "Booking Confirmed!", description: toastMessage });
-            
+
             setIsBookingDialogOpen(false);
             setSelectedBoat(null);
             setBoats([]);
@@ -234,24 +232,19 @@ export default function ProfilePage() {
     } else if (boat.type === 'speed') {
         calculatedFare = 1800;
     }
-    
+
     setBaseFare(calculatedFare);
     setSelectedBoat(boat);
     setIsBookingDialogOpen(true);
   };
-  
-  useEffect(() => {
-    if (receiptData) {
-      setTimeout(() => {
-        handlePrint();
-      }, 100);
-    }
-  }, [receiptData, handlePrint]);
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
+    setTimeout(() => {
+        handlePrint();
+    }, 100);
   };
-  
+
   const handleCancelBooking = async (bookingId: string) => {
     if (!user) return;
     try {
@@ -288,7 +281,7 @@ export default function ProfilePage() {
        </div>
     )
   }
-  
+
   const paidBookings = userBookings.filter(b => b.status === 'confirmed' || b.status === 'completed');
   const statusVariant = (status: Booking['status']) => {
     switch (status) {
@@ -412,11 +405,11 @@ export default function ProfilePage() {
                                             <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
                                             <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
                                             {booking.finalFare && <p className="text-xs font-bold">Fare: Ksh {booking.finalFare.toLocaleString()}</p>}
-                                             {booking.bookingType === 'seat' && booking.boat?.capacity && (
+                                             {booking.bookingType === 'seat' && booking.boat?.capacity && booking.seats ? (
                                                 <p className="text-xs text-muted-foreground">
-                                                   Seats remaining: {booking.boat.capacity - (booking.seats ?? 0)}
+                                                   Seats remaining: {booking.boat.capacity - booking.seats}
                                                 </p>
-                                            )}
+                                            ) : null}
                                         </div>
                                          <div className="flex items-center gap-2 self-end sm:self-center">
                                             <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
@@ -494,9 +487,9 @@ export default function ProfilePage() {
                         {bookingType === 'seat' && (
                             <div className="grid gap-2">
                                 <Label htmlFor="seats">Number of Seats</Label>
-                                <Input 
-                                    id="seats" 
-                                    type="number" 
+                                <Input
+                                    id="seats"
+                                    type="number"
                                     value={numSeats}
                                     onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10)))}
                                     min="1"
@@ -506,7 +499,7 @@ export default function ProfilePage() {
                             </div>
                         )}
                     </div>
-                    
+
                     <div className="space-y-2">
                         <div className="flex justify-between items-center font-semibold text-lg">
                             <span>Total Fare:</span>
@@ -617,3 +610,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
