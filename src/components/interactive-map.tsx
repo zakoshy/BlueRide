@@ -13,17 +13,20 @@ export function InteractiveMap({ apiKey, pickup, destination }: MapProps) {
     const mapRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (!apiKey) {
+            console.error("Google Maps API key is missing.");
+            return;
+        }
+
         const loader = new Loader({
             apiKey: apiKey,
             version: 'weekly',
             libraries: ['marker', 'routes']
         });
 
-        let map: google.maps.Map | null = null;
-
-        loader.importLibrary('maps').then(async ({Map}) => {
+        loader.load().then(async () => {
              if (mapRef.current) {
-                map = new Map(mapRef.current, {
+                const map = new google.maps.Map(mapRef.current, {
                     center: pickup,
                     zoom: 12,
                     mapId: 'BLUE_RIDE_MAP',
@@ -79,7 +82,6 @@ export function InteractiveMap({ apiKey, pickup, destination }: MapProps) {
                         console.error(`Directions request failed due to ${status}`);
                     }
                 });
-
              }
         }).catch(e => {
             console.error("Error loading Google Maps", e);
