@@ -33,7 +33,6 @@ const formSchema = z.object({
 export function LoginForm() {
   const { toast } = useToast()
   const router = useRouter()
-  const { refetchProfile } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -81,7 +80,6 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       await saveUserToDb(result.user);
-      await refetchProfile();
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/profile');
     } catch (error: any) {
@@ -103,7 +101,6 @@ export function LoginForm() {
     setIsSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      await refetchProfile();
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/profile');
     } catch (error: any) {
