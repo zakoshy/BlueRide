@@ -1,0 +1,208 @@
+
+"use client";
+
+import { useAuth } from "@/hooks/use-auth";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, AlertCircle, Anchor, Ship, User, Map, CloudSun, CheckSquare } from "lucide-react";
+import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Header } from "@/components/header";
+import { useToast } from "@/hooks/use-toast";
+import type { User as FirebaseUser } from "firebase/auth";
+import { Badge } from "@/components/ui/badge";
+
+interface Booking {
+    _id: string;
+    pickup: string;
+    destination: string;
+    status: 'confirmed' | 'completed' | 'rejected';
+    rider: { name: string, uid: string };
+    boat: { name: string, licenseNumber: string };
+    seats?: number;
+    bookingType: 'seat' | 'whole_boat';
+    createdAt: string;
+}
+
+export default function CaptainDashboardPage() {
+  const { user, profile, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const [isCaptain, setIsCaptain] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [trips, setTrips] = useState<Booking[]>([]);
+
+  const fetchCaptainTrips = useCallback(async (currentUser: FirebaseUser) => {
+    if (!currentUser) return;
+    setLoading(true);
+    try {
+        const response = await fetch(`/api/captain/trips?captainId=${currentUser.uid}`);
+        if (response.ok) {
+            const data = await response.json();
+            setTrips(data);
+        } else {
+            toast({ title: "Error", description: "Failed to fetch assigned trips.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to fetch trips", error);
+        toast({ title: "Error", description: "An unexpected error occurred while fetching trips.", variant: "destructive" });
+    } finally {
+        setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    if (profile?.role === 'captain' || profile?.role === 'admin') {
+      setIsCaptain(true);
+      fetchCaptainTrips(user);
+    } else {
+      router.push('/profile');
+    }
+  }, [user, profile, authLoading, router, fetchCaptainTrips]);
+  
+  const handleCompleteTrip = async (bookingId: string) => {
+     try {
+        const response = await fetch('/api/bookings/status', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId, status: 'completed' }),
+        });
+
+        if(response.ok) {
+             toast({ title: "Success", description: `Trip has been marked as completed.` });
+             if (user) fetchCaptainTrips(user);
+        } else {
+             const errorData = await response.json();
+             toast({ title: "Update Failed", description: errorData.message || "Could not update booking.", variant: "destructive" });
+        }
+
+    } catch (error) {
+         console.error("Failed to update booking status", error);
+         toast({ title: "Error", description: "An unexpected error occurred while updating booking.", variant: "destructive" });
+    }
+  };
+
+
+  if (loading || authLoading) {
+    return (
+       <div className="flex min-h-dvh w-full items-center justify-center bg-secondary/50 p-4">
+        <div className="w-full max-w-4xl space-y-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-10 w-full" />
+           <Card>
+            <CardHeader>
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-full max-w-lg" />
+            </CardHeader>
+             <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                </div>
+             </CardContent>
+           </Card>
+        </div>
+       </div>
+    );
+  }
+
+  if (!isCaptain) {
+    return (
+        <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4 text-center">
+            <Alert variant="destructive" className="max-w-md">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Access Denied</AlertTitle>
+                <AlertDescription>
+                   This dashboard is for captains only.
+                </AlertDescription>
+            </Alert>
+            <Button asChild variant="link" className="mt-4">
+              <Link href="/">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Return to Home
+              </Link>
+            </Button>
+        </div>
+    );
+  }
+
+  const activeTrips = trips.filter(t => t.status === 'confirmed');
+
+  return (
+    <div className="min-h-dvh w-full bg-secondary/50">
+      <Header />
+      <main className="container mx-auto p-4 sm:p-6 md:p-8">
+        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2"><Anchor/> Captain's Dashboard</h1>
+        <p className="text-muted-foreground mb-8">Welcome, {user?.displayName}. Here are your assigned trips and tools.</p>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Ship/>Active Trips</CardTitle>
+                        <CardDescription>These trips are confirmed and awaiting completion.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       {activeTrips.length > 0 ? (
+                            <div className="space-y-4">
+                                {activeTrips.map(trip => (
+                                    <Card key={trip._id} className="p-4 flex flex-col sm:flex-row justify-between items-start gap-4">
+                                        <div>
+                                            <p className="font-semibold text-primary">{trip.pickup} to {trip.destination}</p>
+                                            <p className="text-sm text-muted-foreground">Rider: {trip.rider.name}</p>
+                                            <p className="text-sm text-muted-foreground">Vessel: {trip.boat.name} ({trip.boat.licenseNumber})</p>
+                                            <p className="text-xs text-muted-foreground">{trip.bookingType === 'seat' ? `${trip.seats} seat(s)` : 'Whole boat charter'}</p>
+                                        </div>
+                                        <Button size="sm" onClick={() => handleCompleteTrip(trip._id)}>
+                                            <CheckSquare className="mr-2"/> Mark Completed
+                                        </Button>
+                                    </Card>
+                                ))}
+                            </div>
+                       ) : (
+                         <div className="text-center py-12">
+                            <Anchor className="mx-auto h-12 w-12 text-muted-foreground" />
+                            <h3 className="mt-4 text-lg font-medium">No Active Trips</h3>
+                            <p className="mt-1 text-sm text-muted-foreground">You have no trips assigned right now. Check back soon!</p>
+                         </div>
+                       )}
+                    </CardContent>
+                </Card>
+            </div>
+            
+            <div className="lg:col-span-1 space-y-8">
+                <Card className="bg-blue-50 border-blue-200">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Map/> Live Map</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                         <Map className="mx-auto h-16 w-16 text-blue-400 mb-4" />
+                         <p className="text-muted-foreground text-sm">Real-time navigation and trip tracking will be available here.</p>
+                         <Button variant="secondary" className="mt-4" disabled>Coming Soon</Button>
+                    </CardContent>
+                </Card>
+                 <Card className="bg-yellow-50 border-yellow-200">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><CloudSun/> Weather Forecast</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                         <CloudSun className="mx-auto h-16 w-16 text-yellow-400 mb-4" />
+                         <p className="text-muted-foreground text-sm">Live weather alerts and sea conditions will be shown here for safety.</p>
+                         <Button variant="secondary" className="mt-4" disabled>Coming Soon</Button>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+      </main>
+    </div>
+  );
+}
