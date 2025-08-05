@@ -92,8 +92,14 @@ export default function ProfilePage() {
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
     documentTitle: `BlueRide-Receipt-${receiptData?._id}`,
-    onAfterPrint: () => setReceiptData(null), // Clear receipt data after printing
+    onAfterPrint: () => setReceiptData(null),
   });
+
+  useEffect(() => {
+    if (receiptData) {
+      handlePrint();
+    }
+  }, [receiptData, handlePrint]);
 
 
   useEffect(() => {
@@ -224,12 +230,6 @@ export default function ProfilePage() {
   }
 
   const handleOpenBookingDialog = (boat: Boat) => {
-    if (!pickup || !destination) {
-      toast({ title: "Error", description: "Please select pickup and destination first.", variant: "destructive" });
-      return;
-    }
-    setSelectedBoat(boat);
-
     // Lightweight, client-side fare calculation based on boat type
     let calculatedFare = 1250; // Default standard fare
     if (boat.type === 'luxury') {
@@ -239,16 +239,13 @@ export default function ProfilePage() {
     }
     
     setBaseFare(calculatedFare);
+    setSelectedBoat(boat);
     setIsBookingDialogOpen(true);
   };
 
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
-    // Use a small timeout to allow state to update before printing
-    setTimeout(() => {
-        handlePrint();
-    }, 100); 
   };
 
   if (loading || !user) {
@@ -573,3 +570,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
