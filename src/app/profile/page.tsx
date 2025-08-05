@@ -140,12 +140,6 @@ export default function ProfilePage() {
     fetchUserBookings();
   }, [toast, fetchUserBookings]);
   
-   useEffect(() => {
-    if (receiptData) {
-      handlePrint();
-    }
-  }, [receiptData, handlePrint]);
-  
   const handleFindBoat = useCallback(async () => {
     if (!pickup || !destination) {
       toast({ title: "Missing Information", description: "Please select both a pickup and destination.", variant: "destructive" });
@@ -251,6 +245,10 @@ export default function ProfilePage() {
 
   const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
+    // Use a small timeout to allow state to update before printing
+    setTimeout(() => {
+        handlePrint();
+    }, 100); 
   };
 
   if (loading || !user) {
