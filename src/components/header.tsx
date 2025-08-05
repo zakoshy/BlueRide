@@ -128,7 +128,7 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                    {isAdmin ? (
+                    {isCaptain ? null : isAdmin ? (
                          <DropdownMenuItem asChild>
                           <Link href="/admin">
                             <Shield className="mr-2 h-4 w-4" />
@@ -151,17 +151,10 @@ export function Header() {
                             </Link>
                             </DropdownMenuItem>
                         )}
-                         {isCaptain && (
-                            <DropdownMenuItem asChild>
-                            <Link href="/captain">
-                                <Anchor className="mr-2 h-4 w-4" />
-                                <span>Captain Dashboard</span>
-                            </Link>
-                            </DropdownMenuItem>
-                        )}
                         </>
                     )}
-                  <DropdownMenuSeparator />
+                  
+                  {isCaptain ? null : <DropdownMenuSeparator />}
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
