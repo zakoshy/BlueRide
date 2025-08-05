@@ -73,6 +73,8 @@ export function LoginForm() {
             router.push('/admin');
         } else if (profile?.role === 'boat_owner') {
             router.push('/dashboard');
+        } else if (profile?.role === 'captain') {
+            router.push('/captain');
         } else {
             router.push('/profile');
         }

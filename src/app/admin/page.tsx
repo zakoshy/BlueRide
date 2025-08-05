@@ -94,7 +94,7 @@ export default function AdminPage() {
       setIsAdmin(true);
       fetchUsers();
     } else {
-      router.push('/profile')
+      router.push('/profile');
     }
     setLoading(false);
   }, [user, profile, authLoading, router, fetchUsers]);
@@ -551,5 +551,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
