@@ -512,7 +512,7 @@ export default function ProfilePage() {
                             <div className="space-y-4 rounded-md border bg-card p-4 text-center">
                                <p className="text-sm text-muted-foreground">You will be redirected to PayPal to complete your purchase securely.</p>
                                <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
-                                   <Bot className="mr-2 h-4 w-4"/> Continue with PayPal
+                                   <Bot className="mr-2 h-4 w-4"/> Complete Payment
                                 </Button>
                             </div>
                         </TabsContent>
@@ -572,4 +572,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
