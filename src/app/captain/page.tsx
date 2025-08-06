@@ -43,13 +43,6 @@ export default function CaptainDashboardPage() {
   const [selectedTrip, setSelectedTrip] = useState<Booking | null>(null);
   const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
   const [isBriefingLoading, setBriefingLoading] = useState(false);
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState('');
-
-
-  useEffect(() => {
-    // This is the correct way to access environment variables on the client-side in Next.js
-    setGoogleMapsApiKey(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '');
-  }, []);
 
 
   const fetchCaptainTrips = useCallback(async (currentUser: FirebaseUser) => {
@@ -244,7 +237,6 @@ export default function CaptainDashboardPage() {
                     <h3 className="font-semibold text-center">Route Map</h3>
                     <div className="aspect-video w-full rounded-md border overflow-hidden relative">
                          <InteractiveMap 
-                            apiKey={googleMapsApiKey}
                             pickup={briefing.route.pickup}
                             destination={briefing.route.destination}
                             boatId={selectedTrip.boat._id}
