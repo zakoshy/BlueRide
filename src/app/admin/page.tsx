@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3 } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -214,27 +214,28 @@ export default function AdminPage() {
     }
   }
 
-  const handleValidateBoat = async (boatId: string) => {
+  const handleBoatValidationStatusChange = async (boatId: string, status: boolean) => {
     if (!selectedOwner) return;
     try {
         const response = await fetch(`/api/boats`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ boatId, isValidated: true }),
+            body: JSON.stringify({ boatId, isValidated: status }),
         });
 
         if (response.ok) {
-            toast({ title: "Success", description: "Boat has been validated." });
+            toast({ title: "Success", description: `Boat status has been updated.` });
             fetchBoatsForOwner(selectedOwner.uid); // Refresh the list
         } else {
             const errorData = await response.json();
-            toast({ title: "Validation Failed", description: errorData.message || "Could not validate boat.", variant: "destructive" });
+            toast({ title: "Update Failed", description: errorData.message || "Could not update boat status.", variant: "destructive" });
         }
     } catch (error) {
-        console.error("Failed to validate boat", error);
-        toast({ title: "Error", description: "An unexpected error occurred during validation.", variant: "destructive" });
+        console.error("Failed to update boat status", error);
+        toast({ title: "Error", description: "An unexpected error occurred during status update.", variant: "destructive" });
     }
   }
+
 
   if (loading || authLoading) {
     return (
@@ -524,17 +525,21 @@ export default function AdminPage() {
                                     <TableCell>{boat.capacity}</TableCell>
                                     <TableCell className="font-mono text-xs">{boat.licenseNumber}</TableCell>
                                     <TableCell>
-                                        <Badge variant={boat.isValidated ? 'default' : 'secondary'} className={boat.isValidated ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                        <Badge variant={boat.isValidated ? 'default' : 'destructive'} className={boat.isValidated ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                                             {boat.isValidated ? 
                                                 <><CheckCircle className="mr-1 h-3 w-3"/> Validated</> : 
-                                                <><XCircle className="mr-1 h-3 w-3"/> Pending</>
+                                                <><XCircle className="mr-1 h-3 w-3"/> Suspended / Pending</>
                                             }
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {!boat.isValidated && (
-                                            <Button variant="outline" size="sm" onClick={() => handleValidateBoat(boat._id)}>
-                                                Validate
+                                        {boat.isValidated ? (
+                                            <Button variant="destructive" size="sm" onClick={() => handleBoatValidationStatusChange(boat._id, false)}>
+                                                <Ban className="mr-2 h-4 w-4" /> Suspend
+                                            </Button>
+                                        ) : (
+                                            <Button variant="outline" size="sm" onClick={() => handleBoatValidationStatusChange(boat._id, true)}>
+                                                <CheckCircle className="mr-2 h-4 w-4" /> Validate
                                             </Button>
                                         )}
                                     </TableCell>
@@ -551,3 +556,6 @@ export default function AdminPage() {
     </div>
   );
 }
+
+
+    
