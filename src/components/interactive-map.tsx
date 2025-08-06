@@ -17,27 +17,27 @@ interface MapProps {
 
 export function InteractiveMap({ pickup, destination }: MapProps) {
     const mapRef = useRef<HTMLDivElement>(null);
-    const mapInstance = useRef<L.Map | null>(null); // Ref to store map instance
+    const mapInstance = useRef<L.Map | null>(null);
 
     useEffect(() => {
-        // Ensure this code runs only on the client
-        if (typeof window !== 'undefined' && mapRef.current) {
+        if (mapRef.current) {
             
+            // This is the fix: we are manually setting the icon paths for Leaflet's default icon.
+            // This needs to be done before any markers are created.
+            // @ts-ignore
+            delete L.Icon.Default.prototype._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconRetinaUrl: iconRetinaUrl.src,
+                iconUrl: iconUrl.src,
+                shadowUrl: shadowUrl.src,
+            });
+
             // Check if map is already initialized on this container
-            if (mapInstance.current) {
+            if (mapRef.current.hasChildNodes()) { // A simple check to see if Leaflet has already attached the map
+                // If you need to update the map, do it here.
+                // For now, we assume it doesn't need updates after initialization.
                 return;
             }
-
-            // Create a stable, custom icon
-            const defaultIcon = L.icon({
-                iconUrl: iconUrl.src,
-                iconRetinaUrl: iconRetinaUrl.src,
-                shadowUrl: shadowUrl.src,
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
-            });
 
             // Calculate center and bounds
             const bounds = L.latLngBounds([
@@ -48,16 +48,16 @@ export function InteractiveMap({ pickup, destination }: MapProps) {
             
             // Initialize the map
             const map = L.map(mapRef.current).setView(center, 13);
-            mapInstance.current = map; // Store instance
+            mapInstance.current = map;
 
             // Add OpenStreetMap tile layer
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
-            // Add markers with the custom icon
-            L.marker([pickup.lat, pickup.lng], { icon: defaultIcon }).addTo(map).bindPopup('Pickup');
-            L.marker([destination.lat, destination.lng], { icon: defaultIcon }).addTo(map).bindPopup('Destination');
+            // Add markers. They will now use the corrected default icon.
+            L.marker([pickup.lat, pickup.lng]).addTo(map).bindPopup('Pickup');
+            L.marker([destination.lat, destination.lng]).addTo(map).bindPopup('Destination');
             
             // Fit map to bounds
             map.fitBounds(bounds, { padding: [50, 50] });
@@ -74,5 +74,3 @@ export function InteractiveMap({ pickup, destination }: MapProps) {
 
     return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;
 }
-
-    
