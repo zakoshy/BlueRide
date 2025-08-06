@@ -52,12 +52,7 @@ export default function CaptainDashboardPage() {
     try {
         const response = await fetch(`/api/captain/trips?captainId=${captainId}`);
         if(response.ok) {
-            let data = await response.json();
-            // ** ADDED: Frontend safeguard to ensure we only use trips with valid coordinates **
-            data = data.filter((trip: Trip) => 
-                trip.pickup && typeof trip.pickup.lat === 'number' && typeof trip.pickup.lng === 'number' &&
-                trip.destination && typeof trip.destination.lat === 'number' && typeof trip.destination.lng === 'number'
-            );
+            const data = await response.json();
             setTrips(data);
         } else {
             toast({ title: "Error", description: "Could not fetch assigned trips.", variant: "destructive" });
@@ -92,9 +87,23 @@ export default function CaptainDashboardPage() {
   }, [user, profile, authLoading, router, fetchTrips]);
 
   const handleSelectTrip = async (trip: Trip) => {
+    // A trip can be selected even if its coordinates are missing.
+    // The map component will handle the case where destination is not available.
+    if (!trip.pickup?.name || !trip.destination?.name) {
+        toast({
+            title: "Trip Data Incomplete",
+            description: "This trip is missing location data and cannot be displayed on the map.",
+            variant: "destructive"
+        });
+        setSelectedTrip(trip);
+        setBriefing(null);
+        return;
+    }
+
     setSelectedTrip(trip);
     setBriefing(null);
     setIsBriefingLoading(true);
+
     try {
         const input: FirstMateInput = {
             pickup: trip.pickup.name,
@@ -151,6 +160,8 @@ export default function CaptainDashboardPage() {
     );
   }
 
+  const destination = selectedTrip ? { lat: selectedTrip.pickup.lat, lng: selectedTrip.pickup.lng } : null;
+
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
        <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -167,7 +178,7 @@ export default function CaptainDashboardPage() {
         <main className="container mx-auto p-4 sm:p-6 md:p-8">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold">Captain's Dashboard</h1>
-                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned trips for today.</p>
+                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned trips. Select one to view the route to your passenger.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -175,7 +186,7 @@ export default function CaptainDashboardPage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Trip Manifest</CardTitle>
-                            <CardDescription>Select a trip to view details and route.</CardDescription>
+                            <CardDescription>Select a trip to view details and route to pickup.</CardDescription>
                         </CardHeader>
                         <CardContent className="max-h-[60vh] overflow-y-auto">
                             {trips.length > 0 ? (
@@ -183,8 +194,8 @@ export default function CaptainDashboardPage() {
                                 {trips.map(trip => (
                                     <button key={trip._id} onClick={() => handleSelectTrip(trip)} className={`w-full text-left p-3 rounded-lg border transition-all ${selectedTrip?._id === trip._id ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'}`}>
                                         <p className="font-semibold">{trip.boat.name}</p>
-                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> From: <span className="font-medium">{trip.pickup.name}</span></p>
-                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> To: <span className="font-medium">{trip.destination.name}</span></p>
+                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> From: <span className="font-medium">{trip.pickup.name || 'Unknown'}</span></p>
+                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> To: <span className="font-medium">{trip.destination.name || 'Unknown'}</span></p>
                                         <p className="text-sm text-muted-foreground">Rider: {trip.rider.name}</p>
                                         <Badge variant="outline" className="mt-1">{trip.bookingType === 'seat' ? `${trip.seats} Seat(s)` : `Whole Boat`}</Badge>
                                     </button>
@@ -201,11 +212,10 @@ export default function CaptainDashboardPage() {
                     <div className="h-[50vh] w-full">
                          <InteractiveMap 
                             key={selectedTrip?._id || 'no-trip'} 
-                            route={briefing?.route || null} 
-                            initialCenter={selectedTrip ? { lat: selectedTrip.pickup.lat, lng: selectedTrip.pickup.lng } : undefined}
+                            destination={destination}
                          />
                     </div>
-                    {isBriefingLoading && (
+                    {selectedTrip && isBriefingLoading && (
                         <Card>
                             <CardHeader><CardTitle>Loading First Mate Briefing...</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
@@ -218,8 +228,8 @@ export default function CaptainDashboardPage() {
                     {briefing && selectedTrip && (
                          <Card>
                             <CardHeader>
-                                <CardTitle>First Mate Briefing: {selectedTrip.pickup.name} to {selectedTrip.destination.name}</CardTitle>
-                                <CardDescription>Your AI-powered pre-trip summary and advice.</CardDescription>
+                                <CardTitle>Passenger Trip Briefing: {selectedTrip.pickup.name} to {selectedTrip.destination.name}</CardTitle>
+                                <CardDescription>Your AI-powered summary for the upcoming trip with the passenger.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div>
@@ -236,14 +246,14 @@ export default function CaptainDashboardPage() {
                                 </div>
 
                                 <div className="pt-4 flex justify-end gap-2">
-                                     <Button variant="outline"><CheckSquare className="mr-2"/>Acknowledge & Start Trip</Button>
+                                     <Button variant="outline"><CheckSquare className="mr-2"/>Start Passenger Trip</Button>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
-                     {!selectedTrip && !isBriefingLoading && (
+                     {!selectedTrip && (
                         <Card className="flex items-center justify-center h-48">
-                            <p className="text-muted-foreground">Please select a trip to view details.</p>
+                            <p className="text-muted-foreground">Please select a trip to view route to passenger.</p>
                         </Card>
                     )}
                 </div>
@@ -253,5 +263,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-
-    

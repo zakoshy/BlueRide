@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -10,28 +10,25 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 
-interface Route {
-    pickup: { lat: number; lng: number; };
-    destination: { lat: number; lng: number; };
-}
-
 interface InteractiveMapProps {
-    route: Route | null;
-    initialCenter?: { lat: number; lng: number; };
+    destination: { lat: number; lng: number; } | null;
 }
 
-const InteractiveMap = ({ route, initialCenter }: InteractiveMapProps) => {
+const InteractiveMap = ({ destination }: InteractiveMapProps) => {
     const mapRef = useRef<L.Map | null>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const boatMarkerRef = useRef<L.Marker | null>(null);
+    const routeLineRef = useRef<L.Polyline | null>(null);
+    const startMarkerRef = useRef<L.Marker | null>(null);
+    const endMarkerRef = useRef<L.Marker | null>(null);
     const animationFrameRef = useRef<number | null>(null);
 
     // Default center to Mombasa if no initial center is provided
-    const defaultCenter: L.LatLngTuple = [initialCenter?.lat || -4.0435, initialCenter?.lng || 39.6682];
-    const defaultZoom = initialCenter ? 14 : 12;
+    const defaultCenter: L.LatLngTuple = [-4.0435, 39.6682];
 
     useEffect(() => {
         // --- Leaflet Icon Fix ---
+        // This is necessary for Next.js to properly handle Leaflet's default icon paths.
         // @ts-ignore
         delete L.Icon.Default.prototype._getIconUrl;
         L.Icon.Default.mergeOptions({
@@ -39,114 +36,134 @@ const InteractiveMap = ({ route, initialCenter }: InteractiveMapProps) => {
             iconUrl: iconUrl.src,
             shadowUrl: shadowUrl.src,
         });
-
+        
         const boatIcon = L.icon({
             iconUrl: '/boat.png',
             iconSize: [40, 40],
             iconAnchor: [20, 20],
         });
-
-        if (mapContainerRef.current && !mapRef.current) {
-            mapRef.current = L.map(mapContainerRef.current, {
+        
+        const mapContainer = mapContainerRef.current;
+        if (mapContainer && !mapRef.current) {
+            // Check if map is already initialized
+             if ((mapContainer as any)._leaflet_id) {
+                return;
+            }
+            mapRef.current = L.map(mapContainer, {
                 center: defaultCenter,
-                zoom: defaultZoom
+                zoom: 13
             });
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 attribution: "© OpenStreetMap",
             }).addTo(mapRef.current);
         }
-
+        
         const map = mapRef.current;
         if (!map) return;
+        
+        const clearMap = () => {
+            if (boatMarkerRef.current) map.removeLayer(boatMarkerRef.current);
+            if (routeLineRef.current) map.removeLayer(routeLineRef.current);
+            if (startMarkerRef.current) map.removeLayer(startMarkerRef.current);
+            if (endMarkerRef.current) map.removeLayer(endMarkerRef.current);
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
 
-        // Clear previous layers
-        map.eachLayer(layer => {
-            if (layer instanceof L.Marker || layer instanceof L.Polyline) {
-                map.removeLayer(layer);
+            boatMarkerRef.current = null;
+            routeLineRef.current = null;
+            startMarkerRef.current = null;
+            endMarkerRef.current = null;
+        }
+
+        const animateBoat = (routePath: L.LatLng[]) => {
+            clearMap(); // Clear previous animations and routes
+            
+            // Re-add markers
+            startMarkerRef.current = L.marker(routePath[0]).addTo(map).bindPopup("Your Location");
+            endMarkerRef.current = L.marker(routePath[routePath.length -1]).addTo(map).bindPopup("Passenger Pickup");
+            
+             // Re-add route line
+            routeLineRef.current = L.geoJSON({ type: "LineString", coordinates: routePath.map(latLng => [latLng.lng, latLng.lat]) }, { style: { color: "blue", weight: 5, opacity: 0.7 } }).addTo(map);
+
+            if (!boatMarkerRef.current) {
+                boatMarkerRef.current = L.marker(routePath[0], { icon: boatIcon, zIndexOffset: 1000 }).addTo(map);
+            } else {
+                boatMarkerRef.current.setLatLng(routePath[0]);
             }
-        });
-        if(boatMarkerRef.current) {
-             map.removeLayer(boatMarkerRef.current);
-             boatMarkerRef.current = null;
-        }
-
-        if (route) {
-            const pickupLatLng = L.latLng(route.pickup.lat, route.pickup.lng);
-            const destinationLatLng = L.latLng(route.destination.lat, route.destination.lng);
-
-            L.marker(pickupLatLng).addTo(map).bindPopup("Pickup");
-            L.marker(destinationLatLng).addTo(map).bindPopup("Destination");
             
-            map.fitBounds(L.latLngBounds(pickupLatLng, destinationLatLng), { padding: [50, 50] });
-            
-            const fetchAndDrawRoute = async () => {
-                try {
-                    const response = await fetch('/api/ors-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            start: [pickupLatLng.lng, pickupLatLng.lat],
-                            end: [destinationLatLng.lng, destinationLatLng.lat],
-                        }),
-                    });
-                    const data = await response.json();
-                    if (response.ok) {
-                        const routeCoordinates = data.features[0].geometry.coordinates.map((coord: number[]) => L.latLng(coord[1], coord[0]));
-                        L.geoJSON(data, { style: { color: "blue", weight: 5, opacity: 0.7 } }).addTo(map);
-                        animateBoat(routeCoordinates);
-                    } else {
-                         // Fallback to a straight line if API fails
-                         L.polyline([pickupLatLng, destinationLatLng], { color: 'red', dashArray: '5, 10' }).addTo(map);
+            let startTime: number | null = null;
+            const duration = 30000; // 30 seconds for animation
+
+            function animationStep(timestamp: number) {
+                if (!startTime) startTime = timestamp;
+                const progress = (timestamp - startTime) / duration;
+
+                if (progress < 1) {
+                    const index = Math.min(Math.floor(progress * routePath.length), routePath.length - 1);
+                    if (boatMarkerRef.current) {
+                        boatMarkerRef.current.setLatLng(routePath[index]);
+                        animationFrameRef.current = requestAnimationFrame(animationStep);
                     }
-                } catch (error) {
-                    console.error("Error fetching route:", error);
-                }
-            };
-            
-            fetchAndDrawRoute();
-
-            const animateBoat = (routePath: L.LatLng[]) => {
-                if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-                
-                if (!boatMarkerRef.current) {
-                    boatMarkerRef.current = L.marker(routePath[0], { icon: boatIcon, zIndexOffset: 1000 }).addTo(map);
                 } else {
-                    boatMarkerRef.current.setLatLng(routePath[0]);
+                     if (boatMarkerRef.current) {
+                        boatMarkerRef.current.setLatLng(routePath[routePath.length - 1]);
+                     }
                 }
-                
-                let startTime: number | null = null;
-                const duration = 30000; // 30 seconds for animation
+            }
+            animationFrameRef.current = requestAnimationFrame(animationStep);
+        };
 
-                function animationStep(timestamp: number) {
-                    if (!startTime) startTime = timestamp;
-                    const progress = (timestamp - startTime) / duration;
+        if (destination && 'geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const captainLocation: L.LatLngTuple = [position.coords.latitude, position.coords.longitude];
+                    const destinationLocation: L.LatLngTuple = [destination.lat, destination.lng];
+                    
+                    map.fitBounds([captainLocation, destinationLocation], { padding: [50, 50] });
 
-                    if (progress < 1) {
-                        const index = Math.min(Math.floor(progress * routePath.length), routePath.length - 1);
-                        if (boatMarkerRef.current) {
-                            boatMarkerRef.current.setLatLng(routePath[index]);
-                            animationFrameRef.current = requestAnimationFrame(animationStep);
+                    try {
+                        const response = await fetch('/api/ors-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                start: [captainLocation[1], captainLocation[0]],
+                                end: [destinationLocation[1], destinationLocation[0]],
+                            }),
+                        });
+                        const data = await response.json();
+                        if (response.ok && data.features && data.features.length > 0) {
+                            const routeCoordinates = data.features[0].geometry.coordinates.map((coord: number[]) => L.latLng(coord[1], coord[0]));
+                            animateBoat(routeCoordinates);
+                        } else {
+                             // Fallback to a straight line if API fails
+                             clearMap();
+                             startMarkerRef.current = L.marker(captainLocation).addTo(map).bindPopup("Your Location");
+                             endMarkerRef.current = L.marker(destinationLocation).addTo(map).bindPopup("Passenger Pickup");
+                             routeLineRef.current = L.polyline([captainLocation, destinationLocation], { color: 'red', dashArray: '5, 10' }).addTo(map);
                         }
-                    } else {
-                         if (boatMarkerRef.current) {
-                            boatMarkerRef.current.setLatLng(routePath[routePath.length - 1]);
-                         }
+                    } catch (error) {
+                         console.error("Error fetching route:", error);
                     }
+                },
+                (error) => {
+                    console.error("Geolocation error:", error);
+                    toast({ title: "Geolocation Error", description: "Could not get your location.", variant: "destructive"});
+                    // Center on destination if geo fails
+                    map.setView([destination.lat, destination.lng], 13);
                 }
-                animationFrameRef.current = requestAnimationFrame(animationStep);
-            };
-        } else if (initialCenter) {
-             map.setView([initialCenter.lat, initialCenter.lng], 14);
+            );
+        } else {
+            // If no destination, just show the default view
+            clearMap();
+            map.setView(defaultCenter, 13);
         }
-
 
         // Cleanup function
         return () => {
-            if (animationFrameRef.current) {
+             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, [route, initialCenter, defaultCenter, defaultZoom]);
+    }, [destination, defaultCenter]);
 
     return (
         <div style={{ position: 'relative', height: '100%', width: '100%', borderRadius: '0.5rem', overflow: 'hidden' }}>
@@ -156,5 +173,3 @@ const InteractiveMap = ({ route, initialCenter }: InteractiveMapProps) => {
 };
 
 export default InteractiveMap;
-
-    
