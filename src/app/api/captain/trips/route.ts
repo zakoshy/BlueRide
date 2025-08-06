@@ -52,16 +52,36 @@ export async function GET(request: Request) {
             }
         },
         {
+            $lookup: {
+                from: 'locations',
+                localField: 'pickup',
+                foreignField: 'name',
+                as: 'pickupLocation'
+            }
+        },
+        {
+            $lookup: {
+                from: 'locations',
+                localField: 'destination',
+                foreignField: 'name',
+                as: 'destinationLocation'
+            }
+        },
+        {
             $unwind: { path: "$riderInfo", preserveNullAndEmptyArrays: true }
         },
         {
             $unwind: { path: "$boatInfo", preserveNullAndEmptyArrays: true }
         },
         {
+            $unwind: { path: "$pickupLocation", preserveNullAndEmptyArrays: true }
+        },
+         {
+            $unwind: { path: "$destinationLocation", preserveNullAndEmptyArrays: true }
+        },
+        {
             $project: {
                 _id: 1,
-                pickup: 1,
-                destination: 1,
                 status: 1,
                 seats: 1,
                 bookingType: 1,
@@ -74,6 +94,16 @@ export async function GET(request: Request) {
                     _id: "$boatInfo._id",
                     name: "$boatInfo.name",
                     licenseNumber: "$boatInfo.licenseNumber"
+                },
+                 pickup: {
+                    name: "$pickup",
+                    lat: "$pickupLocation.lat",
+                    lng: "$pickupLocation.lng"
+                },
+                destination: {
+                    name: "$destination",
+                    lat: "$destinationLocation.lat",
+                    lng: "$destinationLocation.lng"
                 }
             }
         }
@@ -86,3 +116,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+    
