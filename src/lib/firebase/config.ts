@@ -4,12 +4,12 @@ import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDwQtAH3BhE-qKxrWZnV_VBYlj8mple9fg",
-  authDomain: "blueride-landing.firebaseapp.com",
   projectId: "blueride-landing",
-  storageBucket: "blueride-landing.appspot.com",
-  messagingSenderId: "80370688267",
   appId: "1:80370688267:web:859f62f3354b36c17cc20e",
+  storageBucket: "blueride-landing.firebasestorage.app",
+  apiKey: "AIzaSyDx2Eovx2d7Fp8JqabC-h22Hp9jh90kXxY",
+  authDomain: "blueride-landing.firebaseapp.com",
+  messagingSenderId: "80370688267",
   databaseURL: "https://blueride-landing-default-rtdb.firebaseio.com"
 };
 
