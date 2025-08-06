@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -24,7 +24,7 @@ interface MapProps {
     boatId: string;
 }
 
-// Custom hook to set map view
+// Custom component to set map view without re-rendering MapContainer
 const ChangeView = ({ center, zoom }: { center: L.LatLngExpression, zoom: number }) => {
     const map = useMap();
     useEffect(() => {
@@ -34,51 +34,15 @@ const ChangeView = ({ center, zoom }: { center: L.LatLngExpression, zoom: number
 }
 
 export function InteractiveMap({ pickup, destination }: MapProps) {
-    const [route, setRoute] = useState<L.LatLngExpression[]>([]);
-    const orsApiKey = process.env.NEXT_PUBLIC_ORS_API_KEY;
-
-    useEffect(() => {
-        if (!orsApiKey) {
-            console.error("OpenRouteService API key is missing.");
-            return;
-        }
-        
-        const fetchRoute = async () => {
-            try {
-                const response = await fetch('https://api.openrouteservice.org/v2/directions/driving-car', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': orsApiKey,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
-                    },
-                    body: JSON.stringify({
-                        "coordinates": [[pickup.lng, pickup.lat], [destination.lng, destination.lat]]
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`ORS request failed: ${response.status} ${errorText}`);
-                }
-
-                const data = await response.json();
-                if (data.routes && data.routes.length > 0) {
-                    const routeCoordinates = data.routes[0].geometry.map((coord: [number, number]) => [coord[1], coord[0]]); // Swap lng,lat to lat,lng
-                    setRoute(routeCoordinates);
-                }
-
-            } catch (error) {
-                console.error("Error fetching route from OpenRouteService:", error);
-            }
-        };
-
-        if (pickup && destination) {
-            fetchRoute();
-        }
-    }, [pickup.lat, pickup.lng, destination.lat, destination.lng, orsApiKey]);
-
     const center = useMemo(() => [pickup.lat, pickup.lng] as L.LatLngExpression, [pickup.lat, pickup.lng]);
+    const route: L.LatLngExpression[] = [
+        [pickup.lat, pickup.lng],
+        [destination.lat, destination.lng]
+    ];
+
+    if (!pickup || !destination) {
+        return <div className="w-full h-full bg-muted animate-pulse"></div>;
+    }
 
     return (
         <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
@@ -89,7 +53,4 @@ export function InteractiveMap({ pickup, destination }: MapProps) {
             />
             <Marker position={[pickup.lat, pickup.lng]} title="Pickup"></Marker>
             <Marker position={[destination.lat, destination.lng]} title="Destination"></Marker>
-            {route.length > 0 && <Polyline positions={route} color="blue" />}
-        </MapContainer>
-    );
-};
+            <Polyline positions={route} color="blue"
