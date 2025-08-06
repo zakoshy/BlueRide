@@ -79,6 +79,15 @@ export async function GET(request: Request) {
          {
             $unwind: { path: "$destinationLocation", preserveNullAndEmptyArrays: true }
         },
+        // ** ADDED: Ensure that we only return trips where coordinates were successfully found **
+        {
+            $match: {
+                "pickupLocation.lat": { $exists: true, $ne: null },
+                "pickupLocation.lng": { $exists: true, $ne: null },
+                "destinationLocation.lat": { $exists: true, $ne: null },
+                "destinationLocation.lng": { $exists: true, $ne: null },
+            }
+        },
         {
             $project: {
                 _id: 1,

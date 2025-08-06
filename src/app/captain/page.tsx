@@ -52,7 +52,12 @@ export default function CaptainDashboardPage() {
     try {
         const response = await fetch(`/api/captain/trips?captainId=${captainId}`);
         if(response.ok) {
-            const data = await response.json();
+            let data = await response.json();
+            // ** ADDED: Frontend safeguard to ensure we only use trips with valid coordinates **
+            data = data.filter((trip: Trip) => 
+                trip.pickup && typeof trip.pickup.lat === 'number' && typeof trip.pickup.lng === 'number' &&
+                trip.destination && typeof trip.destination.lat === 'number' && typeof trip.destination.lng === 'number'
+            );
             setTrips(data);
         } else {
             toast({ title: "Error", description: "Could not fetch assigned trips.", variant: "destructive" });
