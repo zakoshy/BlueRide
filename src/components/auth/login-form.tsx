@@ -35,6 +35,7 @@ export function LoginForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { refetchProfile } = useAuth();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -80,16 +81,13 @@ export function LoginForm() {
     try {
       const result = await signInWithPopup(auth, provider);
       await saveUserToDb(result.user);
+      await refetchProfile();
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/profile');
     } catch (error: any) {
-      let description = "An unknown error occurred during Google sign-in.";
-      if (error.code) {
-        description = error.message;
-      }
        toast({
         title: "Login Failed",
-        description: description,
+        description: "The email or password you entered is incorrect. Please double-check your credentials.",
         variant: "destructive",
       });
     } finally {
@@ -101,18 +99,13 @@ export function LoginForm() {
     setIsSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
+      await refetchProfile();
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/profile');
     } catch (error: any) {
-       let description = "An unexpected error occurred. Please try again.";
-       if (error.code === 'auth/invalid-credential') {
-            description = "The email or password you entered is incorrect. Please double-check your credentials.";
-        } else if (error.code) {
-            description = error.message;
-        }
        toast({
         title: "Login Failed",
-        description: description,
+        description: "The email or password you entered is incorrect. Please double-check your credentials.",
         variant: "destructive",
       })
     } finally {
