@@ -35,10 +35,10 @@ const ChangeView = ({ center, zoom }: { center: L.LatLngExpression, zoom: number
 
 export function InteractiveMap({ pickup, destination }: MapProps) {
     const center = useMemo(() => [pickup.lat, pickup.lng] as L.LatLngExpression, [pickup.lat, pickup.lng]);
-    const route: L.LatLngExpression[] = [
+    const route: L.LatLngExpression[] = useMemo(() => [
         [pickup.lat, pickup.lng],
         [destination.lat, destination.lng]
-    ];
+    ], [pickup.lat, pickup.lng, destination.lat, destination.lng]);
 
     if (!pickup || !destination) {
         return <div className="w-full h-full bg-muted animate-pulse"></div>;
