@@ -15,7 +15,13 @@ import { useToast } from "@/hooks/use-toast";
 import type { User as FirebaseUser } from "firebase/auth";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { getFirstMateBriefing, type FirstMateInput, type FirstMateOutput } from "@/ai/flows/first-mate-flow";
-import { InteractiveMap } from "@/components/interactive-map";
+import dynamic from 'next/dynamic';
+
+const InteractiveMap = dynamic(() => import('@/components/interactive-map').then(mod => mod.InteractiveMap), {
+  ssr: false,
+  loading: () => <div className="aspect-video w-full rounded-md border bg-muted animate-pulse"></div>
+});
+
 
 interface Booking {
     _id: string;
