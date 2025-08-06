@@ -65,14 +65,46 @@ export function LoginForm() {
       }
        return await response.json();
     } catch (error: any) {
-      toast({
-        title: "Database Error",
-        description: `We had trouble syncing your profile. ${error.message}`,
-        variant: "destructive",
-      });
+      console.error("Error saving user to DB", error);
+      // Don't show a toast here, it might be confusing during login
       return null;
     }
   };
+
+  const handleSuccessfulLogin = async (user: User) => {
+    // Ensure user is in our DB (for Google Sign-In cases)
+    await saveUserToDb(user);
+    // Refetch profile to get the latest role
+    await refetchProfile(); 
+    
+    // Fetch the role again after refetch because the one in useAuth context might be stale
+    const profileResponse = await fetch(`/api/users/${user.uid}`);
+    if (profileResponse.ok) {
+        const profile = await profileResponse.json();
+        toast({ title: "Login Successful", description: "Welcome back!" });
+
+        // Role-based redirection
+        switch (profile.role) {
+            case 'admin':
+                router.push('/admin');
+                break;
+            case 'boat_owner':
+                router.push('/dashboard');
+                break;
+            case 'captain':
+                router.push('/captain');
+                break;
+            case 'rider':
+            default:
+                router.push('/profile');
+                break;
+        }
+    } else {
+        // Fallback if profile fetch fails
+        toast({ title: "Login Successful", description: "Could not retrieve user role, redirecting to profile." });
+        router.push('/profile');
+    }
+  }
 
 
   const handleGoogleSignIn = async () => {
@@ -80,10 +112,7 @@ export function LoginForm() {
     setIsSubmitting(true);
     try {
       const result = await signInWithPopup(auth, provider);
-      await saveUserToDb(result.user);
-      await refetchProfile();
-      toast({ title: "Login Successful", description: "Welcome back!" });
-      router.push('/profile');
+      await handleSuccessfulLogin(result.user);
     } catch (error: any) {
        toast({
         title: "Login Failed",
@@ -98,10 +127,8 @@ export function LoginForm() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      await refetchProfile();
-      toast({ title: "Login Successful", description: "Welcome back!" });
-      router.push('/profile');
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      await handleSuccessfulLogin(userCredential.user);
     } catch (error: any) {
        toast({
         title: "Login Failed",
