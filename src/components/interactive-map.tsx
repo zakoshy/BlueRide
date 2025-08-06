@@ -53,4 +53,7 @@ export function InteractiveMap({ pickup, destination }: MapProps) {
             />
             <Marker position={[pickup.lat, pickup.lng]} title="Pickup"></Marker>
             <Marker position={[destination.lat, destination.lng]} title="Destination"></Marker>
-            <Polyline positions={route} color="blue"
+            <Polyline positions={route} color="blue" />
+        </MapContainer>
+    );
+}
