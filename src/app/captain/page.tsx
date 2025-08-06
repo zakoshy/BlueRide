@@ -239,15 +239,12 @@ export default function CaptainDashboardPage() {
                         </CardContent>
                     </Card>
                 </div>
-                <div className="space-y-4">
-                    <h3 className="font-semibold text-center">Route Map</h3>
-                    <div className="aspect-video w-full rounded-md border overflow-hidden relative">
-                         <InteractiveMap 
-                            pickup={briefing.route.pickup}
-                            destination={briefing.route.destination}
-                            boatId={selectedTrip.boat._id}
-                         />
-                    </div>
+                <div className="h-96 w-full">
+                  <InteractiveMap 
+                      pickup={briefing.route.pickup}
+                      destination={briefing.route.destination}
+                      boatId={selectedTrip.boat._id}
+                  />
                 </div>
             </div>
           )}
@@ -256,3 +253,5 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
+
+    
