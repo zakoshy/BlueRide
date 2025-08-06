@@ -240,11 +240,7 @@ export default function CaptainDashboardPage() {
                     </Card>
                 </div>
                 <div className="h-96 w-full">
-                  <InteractiveMap 
-                      pickup={briefing.route.pickup}
-                      destination={briefing.route.destination}
-                      boatId={selectedTrip.boat._id}
-                  />
+                  <InteractiveMap />
                 </div>
             </div>
           )}
@@ -253,5 +249,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-
-    
