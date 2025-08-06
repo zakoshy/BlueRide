@@ -40,6 +40,9 @@ export function InteractiveMap({ pickup, destination }: MapProps) {
                     [destination.lat, destination.lng]
                 ]);
                 mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+
+                // You might want to remove old markers/polylines here and add new ones
+                // For now, this just adjusts the view.
             }
             return;
         }
@@ -72,7 +75,7 @@ export function InteractiveMap({ pickup, destination }: MapProps) {
             }
         };
 
-    }, [pickup, destination]); // Re-run if location changes, but the guard will prevent re-initialization
+    }, [pickup, destination]); // Re-run if location changes
 
     return <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />;
 }
