@@ -89,25 +89,30 @@ const getRealTimeWeather = ai.defineTool(
     async ({ lat, lng }) => {
         const apiKey = process.env.OPENWEATHERMAP_API_KEY;
         if (!apiKey) {
-            throw new Error("OpenWeatherMap API key is not configured.");
+            console.warn("OpenWeatherMap API key is not configured.");
+            // Return default/unavailable data instead of throwing an error
+            return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
         }
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric`;
         try {
             const response = await fetch(url);
             if (!response.ok) {
                  const errorBody = await response.text();
-                throw new Error(`Failed to fetch weather data. Status: ${response.status}. Body: ${errorBody}`);
+                console.error(`Failed to fetch weather data. Status: ${response.status}. Body: ${errorBody}`);
+                // Return default/unavailable data on API error
+                return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
             }
             const data = await response.json();
             return {
-                description: data.weather[0].description,
-                windSpeed: data.wind.speed,
-                windDeg: data.wind.deg,
-                visibility: data.visibility
+                description: data.weather[0]?.description || 'N/A',
+                windSpeed: data.wind?.speed || 0,
+                windDeg: data.wind?.deg || 0,
+                visibility: data.visibility || 10000
             };
         } catch (error) {
             console.error("Error fetching weather data:", error);
-            throw new Error("An unexpected error occurred while fetching weather data.");
+             // Return default/unavailable data on network or other errors
+            return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
         }
     }
 );
@@ -123,9 +128,9 @@ const briefingPrompt = ai.definePrompt({
 
     The captain has provided a pickup and destination location.
     1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for BOTH the pickup and destination points.
-    2.  Use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather.
-    3.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
-    4.  Provide brief, actionable navigation advice based on the route and the real weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
+    2.  Use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather. If the weather service is unavailable, note that in your advice.
+    3.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves, no wind means calm). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
+    4.  Provide brief, actionable navigation advice based on the route and the weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
     5.  Return all the required data in the specified JSON format. Crucially, the 'route' field in your response MUST contain the latitude and longitude for both the pickup and destination points you found in step 1.
 
     Pickup: {{{pickup}}}
