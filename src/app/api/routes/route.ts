@@ -4,56 +4,127 @@ import clientPromise from '@/lib/mongodb';
 
 const routesData = {
   "routes": [
-    // Mombasa County routes
+    // Mombasa County (2 docking points)
     { "from": "Likoni Ferry Terminal", "to": "Marina English Point", "fare_per_person_kes": 70 },
     { "from": "Marina English Point", "to": "Likoni Ferry Terminal", "fare_per_person_kes": 70 },
 
-    // Kilifi County routes
-    { "from": "Kilifi Jetty", "to": "Bofa Jetty", "fare_per_person_kes": 150 },
-    { "from": "Bofa Jetty", "to": "Kilifi Jetty", "fare_per_person_kes": 150 },
-    { "from": "Kilifi Jetty", "to": "Malindi Jetty", "fare_per_person_kes": 800 },
-    { "from": "Malindi Jetty", "to": "Kilifi Jetty", "fare_per_person_kes": 800 },
-    { "from": "Bofa Jetty", "to": "Malindi Jetty", "fare_per_person_kes": 850 },
-    { "from": "Malindi Jetty", "to": "Bofa Jetty", "fare_per_person_kes": 850 },
-
-    // Kwale County routes
-    { "from": "Shimoni Jetty", "to": "Vanga Port", "fare_per_person_kes": 500 },
-    { "from": "Vanga Port", "to": "Shimoni Jetty", "fare_per_person_kes": 500 },
-    { "from": "Shimoni Jetty", "to": "Wasini Island Jetty", "fare_per_person_kes": 100 },
-    { "from": "Wasini Island Jetty", "to": "Shimoni Jetty", "fare_per_person_kes": 100 },
-    { "from": "Wasini Island Jetty", "to": "Gasi Dock", "fare_per_person_kes": 250 },
-    { "from": "Gasi Dock", "to": "Wasini Island Jetty", "fare_per_person_kes": 250 },
-    { "from": "Shimoni Jetty", "to": "Funzi Island Dock", "fare_per_person_kes": 300 },
-    { "from": "Funzi Island Dock", "to": "Shimoni Jetty", "fare_per_person_kes": 300 },
-
-    // Lamu County routes
-    { "from": "Lamu Port", "to": "Malindi Jetty", "fare_per_person_kes": 2100 },
-    { "from": "Malindi Jetty", "to": "Lamu Port", "fare_per_person_kes": 2100 },
-
-    // Inter-county routes
-    // Mombasa to Kilifi
+    // Mombasa County inter-county routes from both docks
     { "from": "Likoni Ferry Terminal", "to": "Kilifi Jetty", "fare_per_person_kes": 1000 },
     { "from": "Kilifi Jetty", "to": "Likoni Ferry Terminal", "fare_per_person_kes": 1000 },
 
-    // Mombasa to Kwale
+    { "from": "Marina English Point", "to": "Kilifi Jetty", "fare_per_person_kes": 950 },
+    { "from": "Kilifi Jetty", "to": "Marina English Point", "fare_per_person_kes": 950 },
+
     { "from": "Likoni Ferry Terminal", "to": "Shimoni Jetty", "fare_per_person_kes": 350 },
     { "from": "Shimoni Jetty", "to": "Likoni Ferry Terminal", "fare_per_person_kes": 350 },
 
-    // Mombasa to Lamu
-    { "from": "Marina English Point", "to": "Lamu Port", "fare_per_person_kes": 3000 },
-    { "from": "Lamu Port", "to": "Marina English Point", "fare_per_person_kes": 3000 },
+    { "from": "Marina English Point", "to": "Shimoni Jetty", "fare_per_person_kes": 380 },
+    { "from": "Shimoni Jetty", "to": "Marina English Point", "fare_per_person_kes": 380 },
 
-    // Kilifi to Kwale
+    { "from": "Likoni Ferry Terminal", "to": "Lamu Port", "fare_per_person_kes": 3000 },
+    { "from": "Lamu Port", "to": "Likoni Ferry Terminal", "fare_per_person_kes": 3000 },
+
+    { "from": "Marina English Point", "to": "Lamu Port", "fare_per_person_kes": 2900 },
+    { "from": "Lamu Port", "to": "Marina English Point", "fare_per_person_kes": 2900 },
+
+    // Kilifi County (3 docking points)
+    { "from": "Kilifi Jetty", "to": "Bofa Jetty", "fare_per_person_kes": 150 },
+    { "from": "Bofa Jetty", "to": "Kilifi Jetty", "fare_per_person_kes": 150 },
+
+    { "from": "Kilifi Jetty", "to": "Malindi Jetty", "fare_per_person_kes": 800 },
+    { "from": "Malindi Jetty", "to": "Kilifi Jetty", "fare_per_person_kes": 800 },
+
+    { "from": "Bofa Jetty", "to": "Malindi Jetty", "fare_per_person_kes": 850 },
+    { "from": "Malindi Jetty", "to": "Bofa Jetty", "fare_per_person_kes": 850 },
+
+    // Kilifi inter-county routes
     { "from": "Kilifi Jetty", "to": "Shimoni Jetty", "fare_per_person_kes": 1300 },
     { "from": "Shimoni Jetty", "to": "Kilifi Jetty", "fare_per_person_kes": 1300 },
 
-    // Kilifi to Lamu
+    { "from": "Bofa Jetty", "to": "Shimoni Jetty", "fare_per_person_kes": 1250 },
+    { "from": "Shimoni Jetty", "to": "Bofa Jetty", "fare_per_person_kes": 1250 },
+
+    { "from": "Malindi Jetty", "to": "Shimoni Jetty", "fare_per_person_kes": 1350 },
+    { "from": "Shimoni Jetty", "to": "Malindi Jetty", "fare_per_person_kes": 1350 },
+
     { "from": "Kilifi Jetty", "to": "Lamu Port", "fare_per_person_kes": 2000 },
     { "from": "Lamu Port", "to": "Kilifi Jetty", "fare_per_person_kes": 2000 },
 
-    // Kwale to Lamu
-    { "from": "Shimoni Jetty", "to": "Lamu Port", "fare_per_person_kes": 2300 },
-    { "from": "Lamu Port", "to": "Shimoni Jetty", "fare_per_person_kes": 2300 }
+    { "from": "Bofa Jetty", "to": "Lamu Port", "fare_per_person_kes": 2050 },
+    { "from": "Lamu Port", "to": "Bofa Jetty", "fare_per_person_kes": 2050 },
+
+    { "from": "Malindi Jetty", "to": "Lamu Port", "fare_per_person_kes": 2100 },
+    { "from": "Lamu Port", "to": "Malindi Jetty", "fare_per_person_kes": 2100 },
+
+    // Kwale County (5 docking points)
+    { "from": "Shimoni Jetty", "to": "Vanga Port", "fare_per_person_kes": 500 },
+    { "from": "Vanga Port", "to": "Shimoni Jetty", "fare_per_person_kes": 500 },
+
+    { "from": "Shimoni Jetty", "to": "Wasini Island Jetty", "fare_per_person_kes": 100 },
+    { "from": "Wasini Island Jetty", "to": "Shimoni Jetty", "fare_per_person_kes": 100 },
+
+    { "from": "Wasini Island Jetty", "to": "Gasi Dock", "fare_per_person_kes": 250 },
+    { "from": "Gasi Dock", "to": "Wasini Island Jetty", "fare_per_person_kes": 250 },
+
+    { "from": "Shimoni Jetty", "to": "Funzi Island Dock", "fare_per_person_kes": 300 },
+    { "from": "Funzi Island Dock", "to": "Shimoni Jetty", "fare_per_person_kes": 300 },
+
+    { "from": "Vanga Port", "to": "Funzi Island Dock", "fare_per_person_kes": 550 },
+    { "from": "Funzi Island Dock", "to": "Vanga Port", "fare_per_person_kes": 550 },
+
+    { "from": "Vanga Port", "to": "Gasi Dock", "fare_per_person_kes": 400 },
+    { "from": "Gasi Dock", "to": "Vanga Port", "fare_per_person_kes": 400 },
+
+    { "from": "Funzi Island Dock", "to": "Gasi Dock", "fare_per_person_kes": 350 },
+    { "from": "Gasi Dock", "to": "Funzi Island Dock", "fare_per_person_kes": 350 },
+
+    // Kwale inter-county routes
+    { "from": "Shimoni Jetty", "to": "Likoni Ferry Terminal", "fare_per_person_kes": 350 },
+    { "from": "Likoni Ferry Terminal", "to": "Shimoni Jetty", "fare_per_person_kes": 350 },
+
+    { "from": "Vanga Port", "to": "Kilifi Jetty", "fare_per_person_kes": 1400 },
+    { "from": "Kilifi Jetty", "to": "Vanga Port", "fare_per_person_kes": 1400 },
+
+    { "from": "Gasi Dock", "to": "Malindi Jetty", "fare_per_person_kes": 1550 },
+    { "from": "Malindi Jetty", "to": "Gasi Dock", "fare_per_person_kes": 1550 },
+
+    { "from": "Funzi Island Dock", "to": "Malindi Jetty", "fare_per_person_kes": 1600 },
+    { "from": "Malindi Jetty", "to": "Funzi Island Dock", "fare_per_person_kes": 1600 },
+
+    { "from": "Wasini Island Jetty", "to": "Malindi Jetty", "fare_per_person_kes": 1500 },
+    { "from": "Malindi Jetty", "to": "Wasini Island Jetty", "fare_per_person_kes": 1500 },
+
+    { "from": "Vanga Port", "to": "Lamu Port", "fare_per_person_kes": 2300 },
+    { "from": "Lamu Port", "to": "Vanga Port", "fare_per_person_kes": 2300 },
+
+    // Lamu County (5 docking points)
+    { "from": "Lamu Port", "to": "Kiunga Jetty", "fare_per_person_kes": 400 },
+    { "from": "Kiunga Jetty", "to": "Lamu Port", "fare_per_person_kes": 400 },
+
+    { "from": "Lamu Port", "to": "Manda Port", "fare_per_person_kes": 350 },
+    { "from": "Manda Port", "to": "Lamu Port", "fare_per_person_kes": 350 },
+    
+    { "from": "Lamu Port", "to": "Pate Island Jetty", "fare_per_person_kes": 300 },
+    { "from": "Pate Island Jetty", "to": "Lamu Port", "fare_per_person_kes": 300 },
+
+    { "from": "Kiunga Jetty", "to": "Manda Port", "fare_per_person_kes": 450 },
+    { "from": "Manda Port", "to": "Kiunga Jetty", "fare_per_person_kes": 450 },
+
+    { "from": "Kiunga Jetty", "to": "Pate Island Jetty", "fare_per_person_kes": 400 },
+    { "from": "Pate Island Jetty", "to": "Kiunga Jetty", "fare_per_person_kes": 400 },
+
+    { "from": "Manda Port", "to": "Pate Island Jetty", "fare_per_person_kes": 250 },
+    { "from": "Pate Island Jetty", "to": "Manda Port", "fare_per_person_kes": 250 },
+
+    // Inter-county routes from Lamu
+    { "from": "Lamu Port", "to": "Likoni Ferry Terminal", "fare_per_person_kes": 3000 },
+    { "from": "Likoni Ferry Terminal", "to": "Lamu Port", "fare_per_person_kes": 3000 },
+
+    { "from": "Lamu Port", "to": "Kilifi Jetty", "fare_per_person_kes": 2000 },
+    { "from": "Kilifi Jetty", "to": "Lamu Port", "fare_per_person_kes": 2000 },
+
+    { "from": "Lamu Port", "to": "Shimoni Jetty", "fare_per_person_kes": 2800 },
+    { "from": "Shimoni Jetty", "to": "Lamu Port", "fare_per_person_kes": 2800 }
   ]
 };
 
@@ -68,7 +139,10 @@ const locationCoordinates: Record<string, { lat: number, lng: number, county: st
     "Wasini Island Jetty": { lat: -4.665, lng: 39.365, county: "Kwale", area: "Wasini Island" },
     "Gasi Dock": { lat: -4.430, lng: 39.580, county: "Kwale", area: "Gasi" },
     "Funzi Island Dock": { lat: -4.580, lng: 39.450, county: "Kwale", area: "Funzi Island" },
-    "Lamu Port": { lat: -2.270, lng: 40.900, county: "Lamu", area: "Lamu Town" }
+    "Lamu Port": { lat: -2.270, lng: 40.900, county: "Lamu", area: "Lamu Town" },
+    "Kiunga Jetty": { lat: -1.740, lng: 41.450, county: "Lamu", area: "Kiunga" },
+    "Manda Port": { lat: -2.260, lng: 40.920, county: "Lamu", area: "Manda Island" },
+    "Pate Island Jetty": { lat: -2.130, lng: 41.090, county: "Lamu", area: "Pate Island" }
 };
 
 
