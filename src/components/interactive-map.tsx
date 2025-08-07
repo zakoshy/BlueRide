@@ -9,7 +9,6 @@ import 'leaflet/dist/leaflet.css';
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-import boatIconUrl from 'public/boat.png';
 import { useToast } from '@/hooks/use-toast';
 
 interface InteractiveMapProps {
@@ -43,7 +42,7 @@ const InteractiveMap = ({ route }: InteractiveMapProps) => {
         });
         
         const boatIcon = L.icon({
-            iconUrl: boatIconUrl.src,
+            iconUrl: '/boat.png', // Correct path for public assets
             iconSize: [40, 40],
             iconAnchor: [20, 20],
         });
