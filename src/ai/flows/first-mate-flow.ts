@@ -126,7 +126,7 @@ const briefingPrompt = ai.definePrompt({
     2.  Use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather.
     3.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
     4.  Provide brief, actionable navigation advice based on the route and the real weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
-    5.  Return all the required data in the specified JSON format, including the route coordinates you found.
+    5.  Return all the required data in the specified JSON format. Crucially, the 'route' field in your response MUST contain the latitude and longitude for both the pickup and destination points you found in step 1.
 
     Pickup: {{{pickup}}}
     Destination: {{{destination}}}
@@ -150,11 +150,18 @@ const briefingFlow = ai.defineFlow(
                 if (!output) {
                     throw new Error("The AI First Mate failed to generate a briefing. The model returned a null output.");
                 }
+                // Validate that the route object and its coordinates are present
+                if (!output.route || !output.route.pickup || !output.route.destination ||
+                    !output.route.pickup.lat || !output.route.pickup.lng ||
+                    !output.route.destination.lat || !output.route.destination.lng
+                ) {
+                   throw new Error("The AI First Mate failed to return valid route coordinates.");
+                }
                 return output;
             } catch (e: any) {
                 lastError = e;
                 attempt++;
-                console.warn(`Briefing generation attempt ${attempt} failed. Retrying...`);
+                console.warn(`Briefing generation attempt ${attempt} failed: ${e.message}. Retrying...`);
                 // Wait for a short period before retrying
                 if (attempt < maxRetries) {
                     await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
