@@ -128,7 +128,8 @@ export default function ProfilePage() {
         const response = await fetch('/api/routes');
         if (response.ok) {
           const data: string[] = await response.json();
-          setPickupOptions(data.map(loc => ({ value: loc, label: loc })));
+          const uniqueData = [...new Set(data)];
+          setPickupOptions(uniqueData.map(loc => ({ value: loc, label: loc })));
         } else {
           toast({ title: "Error", description: "Could not fetch available pickup locations.", variant: "destructive" });
         }
@@ -626,7 +627,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="text-center mt-10 border-t-2 border-dashed pt-6">
                         <p className="font-semibold">Thank you for choosing BlueRide!</p>
-                        <p className="text-sm text-gray-500 mt-2">Please present this receipt upon boarding. Have a safe and pleasant journey.</p>
+                        <p className="text-sm text-muted-foreground mt-2">Please present this receipt upon boarding. Have a safe and pleasant journey.</p>
                     </div>
                  </div>
             )}
