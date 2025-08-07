@@ -2,72 +2,28 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 
-// Haversine formula to calculate distance between two lat/lng points in KM
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Radius of the earth in km
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c; // Distance in km
-  return d;
-}
-
-function deg2rad(deg: number) {
-  return deg * (Math.PI / 180);
-}
-
-// --- Uber-Style Pricing Constants ---
-// In a real app, these would be stored in an admin-controlled config in the DB
-const BASE_FARE = 100; // Flat starting charge in Ksh
-const RATE_PER_KM = 50; // Ksh per kilometer
-const RATE_PER_MINUTE = 10; // Ksh per minute
-const DEMAND_MULTIPLIER = 1.0; // Default, can be changed based on time/demand
-const AVERAGE_BOAT_SPEED_KPH = 15; // Average speed for a water taxi
-// ---
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const pickupName = searchParams.get('pickup');
-    const destinationName = searchParams.get('destination');
+    const pickup = searchParams.get('pickup');
+    const destination = searchParams.get('destination');
     
-    if (!pickupName || !destinationName) {
+    if (!pickup || !destination) {
       return NextResponse.json({ message: 'Missing required parameters: pickup and destination' }, { status: 400 });
     }
 
     const client = await clientPromise;
     const db = client.db();
-    const locationsCollection = db.collection('locations');
+    const routesCollection = db.collection('routes');
 
-    const pickupLocation = await locationsCollection.findOne({ name: pickupName });
-    const destinationLocation = await locationsCollection.findOne({ name: destinationName });
+    const route = await routesCollection.findOne({ from: pickup, to: destination });
 
-    if (!pickupLocation || !destinationLocation) {
-        return NextResponse.json({ message: 'One or both locations not found' }, { status: 404 });
+    if (!route) {
+        return NextResponse.json({ message: 'The selected route is not available.' }, { status: 404 });
     }
 
-    // --- Fare Calculation ---
-    const distanceKm = getDistance(pickupLocation.lat, pickupLocation.lng, destinationLocation.lat, destinationLocation.lng);
-    
-    // Estimate duration in minutes
-    const estimatedDurationHours = distanceKm / AVERAGE_BOAT_SPEED_KPH;
-    const estimatedDurationMinutes = estimatedDurationHours * 60;
-    
-    const distanceCharge = distanceKm * RATE_PER_KM;
-    const durationCharge = estimatedDurationMinutes * RATE_PER_MINUTE;
-
-    const totalCalculatedFare = BASE_FARE + distanceCharge + durationCharge;
-    const finalFare = Math.round(totalCalculatedFare * DEMAND_MULTIPLIER);
-    // ---
-
     return NextResponse.json({ 
-        fare: finalFare, 
-        distance: distanceKm, 
-        duration: estimatedDurationMinutes 
+        fare: route.fare_per_person_kes
     }, { status: 200 });
 
   } catch (error) {

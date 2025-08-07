@@ -23,15 +23,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 // Define types for our data structures
-interface Location {
-  _id: string;
-  name: string;
-  county: string;
-  area: string;
-  lat: number;
-  lng: number;
-}
-
 interface ComboboxOption {
     value: string;
     label:string;
@@ -71,11 +62,13 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [locationOptions, setLocationOptions] = useState<ComboboxOption[]>([]);
-  const [boats, setBoats] = useState<Boat[]>([]);
+  const [pickupOptions, setPickupOptions] = useState<ComboboxOption[]>([]);
+  const [destinationOptions, setDestinationOptions] = useState<ComboboxOption[]>([]);
+  
   const [pickup, setPickup] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
+  const [boats, setBoats] = useState<Boat[]>([]);
+
 
   const [isFinding, setIsFinding] = useState(false);
   const [selectedBoat, setSelectedBoat] = useState<Boat | null>(null);
@@ -129,52 +122,78 @@ export default function ProfilePage() {
   }, [user, toast]);
 
   useEffect(() => {
-    // Fetch all available locations
-    const fetchLocations = async () => {
+    // Fetch all available pickup locations
+    const fetchPickupLocations = async () => {
       try {
         const response = await fetch('/api/routes');
         if (response.ok) {
-          const data: Location[] = await response.json();
-          setLocations(data);
-          setLocationOptions(data.map(loc => ({ value: loc.name, label: `${loc.name} (${loc.area})` })));
+          const data: string[] = await response.json();
+          setPickupOptions(data.map(loc => ({ value: loc, label: loc })));
         } else {
-          toast({ title: "Error", description: "Could not fetch available locations.", variant: "destructive" });
+          toast({ title: "Error", description: "Could not fetch available pickup locations.", variant: "destructive" });
         }
       } catch (error) {
         toast({ title: "Error", description: "An unexpected error occurred while fetching locations.", variant: "destructive" });
       }
     };
-    fetchLocations();
+    fetchPickupLocations();
     fetchUserBookings();
   }, [toast, fetchUserBookings]);
+
+  // Fetch destinations when pickup changes
+  useEffect(() => {
+    if (!pickup) {
+        setDestinationOptions([]);
+        setDestination("");
+        return;
+    }
+    const fetchDestinations = async () => {
+        try {
+             const response = await fetch(`/api/routes?from=${pickup}`);
+             if (response.ok) {
+                const data: string[] = await response.json();
+                setDestinationOptions(data.map(loc => ({ value: loc, label: loc })));
+             } else {
+                toast({ title: "Error", description: "Could not fetch destinations for this route.", variant: "destructive" });
+             }
+        } catch (error) {
+             toast({ title: "Error", description: "An unexpected error occurred while fetching destinations.", variant: "destructive" });
+        }
+    }
+    fetchDestinations();
+  }, [pickup, toast]);
+
 
   const handleFindBoat = useCallback(async () => {
     if (!pickup || !destination) {
       toast({ title: "Missing Information", description: "Please select both a pickup and destination.", variant: "destructive" });
       return;
     }
-     if (pickup === destination) {
-      toast({ title: "Invalid Route", description: "Pickup and destination cannot be the same.", variant: "destructive" });
-      return;
-    }
 
     setIsFinding(true);
     setBoats([]);
     try {
-      // For now, we fetch all validated boats.
-      // A real application would filter boats based on the selected route.
-      const response = await fetch(`/api/boats?validated=true`);
-      if (response.ok) {
-        const data = await response.json();
-        setBoats(data);
-        if (data.length === 0) {
+      // 1. Get the fare for the selected route
+      const fareResponse = await fetch(`/api/fare?pickup=${pickup}&destination=${destination}`);
+      if (!fareResponse.ok) {
+        throw new Error("This route is not available. Please select another.");
+      }
+      const fareData = await fareResponse.json();
+      setBaseFare(fareData.fare);
+
+      // 2. Fetch all validated boats (a real app would filter by route/availability)
+      const boatsResponse = await fetch(`/api/boats?validated=true`);
+      if (boatsResponse.ok) {
+        const boatsData = await boatsResponse.json();
+        setBoats(boatsData);
+        if (boatsData.length === 0) {
            toast({ title: "No Boats Found", description: "There are currently no boats available for this route. Please check back later.", variant: "default" });
         }
       } else {
         toast({ title: "Error", description: "Could not fetch available boats.", variant: "destructive" });
       }
-    } catch (error) {
-      toast({ title: "Error", description: "An unexpected error occurred while fetching boats.", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "An unexpected error occurred while fetching boats.", variant: "destructive" });
     } finally {
       setIsFinding(false);
     }
@@ -190,11 +209,11 @@ export default function ProfilePage() {
     const bookingDetails = {
         boatId: selectedBoat._id,
         riderId: user.uid,
-        pickup: locationOptions.find(l => l.value === pickup)?.label,
-        destination: locationOptions.find(l => l.value === destination)?.label,
+        pickup: pickup,
+        destination: destination,
         bookingType: bookingType,
         ...(bookingType === 'seat' && { seats: numSeats }),
-        baseFare: baseFare,
+        baseFare: bookingType === 'seat' ? baseFare * numSeats : baseFare * selectedBoat.capacity,
     };
 
      try {
@@ -232,15 +251,6 @@ export default function ProfilePage() {
   }
 
   const handleOpenBookingDialog = (boat: Boat) => {
-    // Lightweight, client-side fare calculation based on boat type
-    let calculatedFare = 1250; // Default standard fare
-    if (boat.type === 'luxury') {
-        calculatedFare = 2500;
-    } else if (boat.type === 'speed') {
-        calculatedFare = 1800;
-    }
-
-    setBaseFare(calculatedFare);
     setSelectedBoat(boat);
     setIsBookingDialogOpen(true);
   };
@@ -290,6 +300,12 @@ export default function ProfilePage() {
         default: return 'outline';
     }
   };
+  
+  const calculatedFare = bookingType === 'seat' 
+    ? baseFare * numSeats 
+    : selectedBoat 
+    ? baseFare * selectedBoat.capacity
+    : 0;
 
 
   return (
@@ -320,9 +336,13 @@ export default function ProfilePage() {
                             <div className="grid w-full gap-1.5">
                                 <Label htmlFor="from">From</Label>
                                 <Combobox
-                                    options={locationOptions.filter(l => l.value !== destination)}
+                                    options={pickupOptions}
                                     selectedValue={pickup}
-                                    onSelect={setPickup}
+                                    onSelect={(value) => {
+                                        setPickup(value);
+                                        setDestination(''); // Reset destination when pickup changes
+                                        setBoats([]); // Clear previous results
+                                    }}
                                     placeholder="Select pickup..."
                                     searchPlaceholder="Search locations..."
                                     notFoundText="No locations found."
@@ -331,12 +351,16 @@ export default function ProfilePage() {
                             <div className="grid w-full gap-1.5">
                                 <Label htmlFor="to">To</Label>
                                 <Combobox
-                                    options={locationOptions.filter(l => l.value !== pickup)}
+                                    options={destinationOptions}
                                     selectedValue={destination}
-                                    onSelect={setDestination}
+                                    onSelect={(value) => {
+                                        setDestination(value);
+                                        setBoats([]); // Clear previous results
+                                    }}
                                     placeholder="Select destination..."
                                     searchPlaceholder="Search locations..."
-                                    notFoundText="No locations found."
+                                    notFoundText="No destinations found."
+                                    disabled={!pickup}
                                 />
                             </div>
                         </div>
@@ -360,7 +384,7 @@ export default function ProfilePage() {
 
                 {boats.length > 0 && pickup && destination && (
                     <div className="space-y-6 mt-8">
-                        <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{locationOptions.find(l=>l.value === pickup)?.label}</span> to <span className="text-primary">{locationOptions.find(l=>l.value === destination)?.label}</span></h2>
+                        <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></h2>
                         <div className="grid gap-6 md:grid-cols-2">
                             {boats.map(boat => (
                                 <Card key={boat._id} className="flex flex-col">
@@ -372,6 +396,7 @@ export default function ProfilePage() {
                                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                             <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
                                         </div>
+                                         <p className="text-lg font-bold mt-2">Ksh {baseFare.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/seat</span></p>
                                     </CardContent>
                                     <CardFooter>
                                         <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>Request a trip</Button>
@@ -473,7 +498,7 @@ export default function ProfilePage() {
                 <div className="grid gap-6 py-4 px-3">
                     <div className="space-y-4 rounded-lg border p-4">
                         <p className="text-sm text-muted-foreground">
-                            You are booking a trip from <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === pickup)?.label}</span> to <span className="font-semibold text-primary">{locationOptions.find(l=>l.value === destination)?.label}</span>.
+                            You are booking a trip from <span className="font-semibold text-primary">{pickup}</span> to <span className="font-semibold text-primary">{destination}</span>.
                         </p>
                         <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
                             <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
@@ -490,7 +515,7 @@ export default function ProfilePage() {
                                     id="seats"
                                     type="number"
                                     value={numSeats}
-                                    onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10)))}
+                                    onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10) || 1))}
                                     min="1"
                                     max={selectedBoat?.capacity}
                                 />
@@ -503,10 +528,10 @@ export default function ProfilePage() {
                         <div className="flex justify-between items-center font-semibold text-lg">
                             <span>Total Fare:</span>
                             <span>
-                                {baseFare > 0 ? `Ksh ${baseFare.toLocaleString()}` : <Skeleton className="h-6 w-20 inline-block"/>}
+                                {calculatedFare > 0 ? `Ksh ${calculatedFare.toLocaleString()}` : <Skeleton className="h-6 w-20 inline-block"/>}
                             </span>
                         </div>
-                        <p className="text-xs text-muted-foreground text-center">Final fare may be adjusted by the boat owner.</p>
+                         {bookingType === 'whole_boat' && selectedBoat && <p className="text-xs text-muted-foreground text-center">Booking the whole boat covers all {selectedBoat.capacity} seats.</p>}
                     </div>
 
                     <Tabs defaultValue="mpesa" className="w-full" onValueChange={(v) => setActivePaymentMethod(v as PaymentMethod)}>
@@ -531,7 +556,7 @@ export default function ProfilePage() {
                                         <Input id="cvc" placeholder="123"/>
                                      </div>
                                 </div>
-                                <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                                <Button onClick={handleBookingSubmit} className="w-full" disabled={calculatedFare <= 0}>
                                     Complete Payment
                                 </Button>
                             </div>
@@ -540,7 +565,7 @@ export default function ProfilePage() {
                             <div className="space-y-4 rounded-md border bg-card p-4">
                                 <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
                                 <Input id="mpesa-phone" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
-                                <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0 || !mpesaPhoneNumber}>
+                                <Button onClick={handleBookingSubmit} className="w-full" disabled={calculatedFare <= 0 || !mpesaPhoneNumber}>
                                     Complete Payment
                                 </Button>
                             </div>
@@ -548,7 +573,7 @@ export default function ProfilePage() {
                         <TabsContent value="paypal">
                             <div className="space-y-4 rounded-md border bg-card p-4 text-center">
                                <p className="text-sm text-muted-foreground">You will be redirected to PayPal to complete your purchase securely.</p>
-                               <Button onClick={handleBookingSubmit} className="w-full" disabled={baseFare <= 0}>
+                               <Button onClick={handleBookingSubmit} className="w-full" disabled={calculatedFare <= 0}>
                                    <CreditCard className="mr-2 h-4 w-4"/> Complete Payment
                                 </Button>
                             </div>
@@ -609,5 +634,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
