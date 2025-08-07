@@ -7,12 +7,25 @@ import { ObjectId } from 'mongodb';
 
 export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    let dateFilter = {};
+    if (startDate && endDate) {
+        dateFilter = {
+            tripCompletedAt: {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate),
+            }
+        };
+    }
+
     const client = await clientPromise;
     const db = client.db();
     
-    // For now, we fetch all financials. In a real app, add pagination and filtering.
     const financials = await db.collection('trip_financials')
-        .find({})
+        .find(dateFilter)
         .sort({ tripCompletedAt: -1 })
         .toArray();
 
@@ -22,3 +35,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
+

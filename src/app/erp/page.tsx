@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, DollarSign, BarChart, AlertCircle, Banknote, Ship, UserCheck, BookOpen, UserSquare } from "lucide-react";
+import { ArrowLeft, Shield, DollarSign, BarChart, AlertCircle, Banknote, Ship, UserCheck, BookOpen, UserSquare, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,6 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
 
 interface TripFinancials {
     _id: string;
@@ -58,6 +61,12 @@ interface Booking {
     finalFare?: number;
 }
 
+interface DailyRevenue {
+    date: string;
+    Revenue: number;
+}
+
+
 export default function ErpPage() {
     const { user, profile, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -66,11 +75,15 @@ export default function ErpPage() {
     const [loading, setLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
     
+    const [currentDate, setCurrentDate] = useState(new Date());
+
     // Financials State
     const [financials, setFinancials] = useState<TripFinancials[]>([]);
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [totalPlatformFee, setTotalPlatformFee] = useState(0);
     const [totalPayouts, setTotalPayouts] = useState(0);
+    const [dailyRevenueData, setDailyRevenueData] = useState<DailyRevenue[]>([]);
+
 
     // Fleet State
     const [fleet, setFleet] = useState<FleetBoat[]>([]);
@@ -82,14 +95,18 @@ export default function ErpPage() {
     const [bookings, setBookings] = useState<Booking[]>([]);
 
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (date: Date) => {
         setLoading(true);
+        const startDate = startOfMonth(date);
+        const endDate = endOfMonth(date);
+        const query = `?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+
         try {
             const [financialsRes, fleetRes, crewRes, bookingsRes] = await Promise.all([
-                fetch('/api/erp/trip-financials'),
+                fetch(`/api/erp/trip-financials${query}`),
                 fetch('/api/erp/fleet'),
                 fetch('/api/erp/crew'),
-                fetch('/api/erp/bookings')
+                fetch('/api/erp/bookings') // Note: Bookings fetch is not yet filtered by date
             ]);
 
             if (financialsRes.ok) {
@@ -101,6 +118,17 @@ export default function ErpPage() {
                 setTotalRevenue(revenue);
                 setTotalPlatformFee(platformFee);
                 setTotalPayouts(payouts);
+
+                // Process data for chart
+                const dailyData: { [key: string]: number } = {};
+                data.forEach((item: TripFinancials) => {
+                    const day = format(new Date(item.tripCompletedAt), 'MMM dd');
+                    if(!dailyData[day]) dailyData[day] = 0;
+                    dailyData[day] += item.finalFare;
+                });
+                const chartData = Object.keys(dailyData).map(date => ({ date, Revenue: dailyData[date] })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                setDailyRevenueData(chartData);
+
             } else {
                  toast({ title: "Error", description: "Failed to fetch financial data.", variant: "destructive" });
             }
@@ -142,13 +170,17 @@ export default function ErpPage() {
         }
         if (profile?.role === 'admin') {
             setIsAdmin(true);
-            fetchData();
+            fetchData(currentDate);
         } else {
             router.push('/profile');
         }
-    }, [user, profile, authLoading, router, fetchData]);
+    }, [user, profile, authLoading, router, fetchData, currentDate]);
+    
+    const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
+    const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
 
-     if (loading || authLoading) {
+
+     if (authLoading) {
         return (
            <div className="flex min-h-dvh w-full items-center justify-center bg-secondary/50 p-4">
             <div className="w-full max-w-6xl space-y-6">
@@ -225,22 +257,31 @@ export default function ErpPage() {
 
             <main className="container mx-auto p-4 sm:p-6 md:p-8">
                 <Tabs defaultValue="financials">
-                    <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                        <TabsTrigger value="financials">Financials</TabsTrigger>
-                        <TabsTrigger value="fleet">Fleet</TabsTrigger>
-                        <TabsTrigger value="crew">Crew</TabsTrigger>
-                        <TabsTrigger value="bookings">Bookings</TabsTrigger>
-                    </TabsList>
+                    <div className="flex justify-between items-center mb-4">
+                        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                            <TabsTrigger value="financials">Financials</TabsTrigger>
+                            <TabsTrigger value="fleet">Fleet</TabsTrigger>
+                            <TabsTrigger value="crew">Crew</TabsTrigger>
+                            <TabsTrigger value="bookings">Bookings</TabsTrigger>
+                        </TabsList>
+                        <div className="flex items-center gap-2 ml-4">
+                            <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft/></Button>
+                            <span className="font-semibold text-lg w-36 text-center">{format(currentDate, 'MMMM yyyy')}</span>
+                            <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight/></Button>
+                        </div>
+                    </div>
 
                     <TabsContent value="financials" className="mt-6">
+                       {loading ? <Skeleton className="h-96 w-full"/> : (
                         <div className="space-y-6">
                             {/* Financial Overview */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><DollarSign/>Financial Overview</CardTitle>
-                                    <CardDescription>A summary of all revenue and payouts across the platform.</CardDescription>
+                                    <CardTitle className="flex items-center gap-2"><DollarSign/>Financial Overview for {format(currentDate, 'MMMM yyyy')}</CardTitle>
+                                    <CardDescription>A summary of all revenue and payouts for the selected month.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
+                                    {financials.length > 0 ? (
                                     <div className="grid gap-4 md:grid-cols-3">
                                         <Card className="p-4">
                                             <CardHeader className="p-2 pt-0">
@@ -270,6 +311,32 @@ export default function ErpPage() {
                                             </CardContent>
                                         </Card>
                                     </div>
+                                    ) : (
+                                       <p className="text-center text-muted-foreground py-8">No financial records to display for this month.</p>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                             <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2"><BarChart/>Revenue Analytics</CardTitle>
+                                    <CardDescription>Daily revenue collection for {format(currentDate, 'MMMM yyyy')}.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                {dailyRevenueData.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <RechartsBarChart data={dailyRevenueData}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="date" />
+                                            <YAxis width={80} tickFormatter={(value) => `Ksh ${value.toLocaleString()}`} />
+                                            <Tooltip formatter={(value) => [`Ksh ${Number(value).toLocaleString()}`, "Revenue"]}/>
+                                            <Legend />
+                                            <Bar dataKey="Revenue" fill="hsl(var(--primary))" />
+                                        </RechartsBarChart>
+                                    </ResponsiveContainer>
+                                 ) : (
+                                    <p className="text-center text-muted-foreground py-8">No revenue data available for charting this month.</p>
+                                 )}
                                 </CardContent>
                             </Card>
 
@@ -277,13 +344,14 @@ export default function ErpPage() {
                              <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><BarChart/>Trip Financials</CardTitle>
-                                    <CardDescription>A detailed breakdown of each completed trip's financials.</CardDescription>
+                                    <CardDescription>A detailed breakdown of each completed trip's financials for the month.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Booking ID</TableHead>
+                                                <TableHead>Date</TableHead>
                                                 <TableHead>Base Fare</TableHead>
                                                 <TableHead>Adj. %</TableHead>
                                                 <TableHead className="text-right">Final Fare</TableHead>
@@ -296,6 +364,7 @@ export default function ErpPage() {
                                             {financials.map(item => (
                                                 <TableRow key={item._id}>
                                                     <TableCell className="font-mono text-xs">{item.bookingId}</TableCell>
+                                                    <TableCell>{format(new Date(item.tripCompletedAt), 'MMM dd, yyyy')}</TableCell>
                                                     <TableCell>Ksh {item.baseFare.toLocaleString()}</TableCell>
                                                     <TableCell>{item.adjustmentPercent}%</TableCell>
                                                     <TableCell className="text-right font-semibold">Ksh {item.finalFare.toLocaleString()}</TableCell>
@@ -307,13 +376,15 @@ export default function ErpPage() {
                                         </TableBody>
                                     </Table>
                                      {financials.length === 0 && !loading && (
-                                        <p className="text-center text-muted-foreground py-8">No financial data available. Complete a trip to see data here.</p>
+                                        <p className="text-center text-muted-foreground py-8">No financial data available for this month.</p>
                                     )}
                                 </CardContent>
                              </Card>
                         </div>
+                       )}
                     </TabsContent>
                     <TabsContent value="fleet" className="mt-6">
+                         {loading ? <Skeleton className="h-64 w-full"/> : (
                          <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2"><Ship/>Fleet Overview</CardTitle>
@@ -351,12 +422,14 @@ export default function ErpPage() {
                                 )}
                             </CardContent>
                          </Card>
+                         )}
                     </TabsContent>
                      <TabsContent value="crew" className="mt-6">
+                         {loading ? <Skeleton className="h-64 w-full"/> : (
                          <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2"><UserSquare/>Crew Performance</CardTitle>
-                                <CardDescription>Track captain performance and earnings.</CardDescription>
+                                <CardDescription>Track captain performance and earnings. Data is for all time.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                <Table>
@@ -384,13 +457,15 @@ export default function ErpPage() {
                                 )}
                             </CardContent>
                          </Card>
+                         )}
                     </TabsContent>
                      <TabsContent value="bookings" className="mt-6">
+                        {loading ? <Skeleton className="h-96 w-full"/> : (
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><BookOpen/>Booking Overview</CardTitle>
-                                    <CardDescription>A high-level summary of all booking activity.</CardDescription>
+                                    <CardDescription>A high-level summary of all booking activity (all-time).</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid gap-4 md:grid-cols-3">
@@ -411,7 +486,7 @@ export default function ErpPage() {
                             </Card>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>All Bookings</CardTitle>
+                                    <CardTitle>All Bookings (All-time)</CardTitle>
                                     <CardDescription>A detailed log of all bookings made on the platform.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
@@ -443,6 +518,7 @@ export default function ErpPage() {
                                 </CardContent>
                             </Card>
                         </div>
+                        )}
                     </TabsContent>
                 </Tabs>
             </main>
