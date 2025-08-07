@@ -1,9 +1,15 @@
 
 import { NextResponse } from 'next/server';
+import { config } from 'dotenv';
+
+config({ path: '.env' });
+config({ path: '.env.local', override: true });
+
 
 export async function POST(request: Request) {
     const ORS_API_KEY = process.env.OPENROUTERSERVICE_API_KEY;
     if (!ORS_API_KEY) {
+        console.error("ORS API key not configured on server");
         return NextResponse.json({ message: 'ORS API key not configured on server' }, { status: 500 });
     }
 
@@ -29,6 +35,7 @@ export async function POST(request: Request) {
 
         if (!orsResponse.ok) {
             const errorMessage = data.error?.message || 'An error occurred with OpenRouteService';
+            console.error(`ORS API Error: ${errorMessage}`);
             return NextResponse.json({ message: errorMessage }, { status: orsResponse.status });
         }
 
