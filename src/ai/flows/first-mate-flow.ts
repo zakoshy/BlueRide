@@ -140,11 +140,31 @@ const briefingFlow = ai.defineFlow(
         outputSchema: FirstMateOutputSchema,
     },
     async (input) => {
-        const { output } = await briefingPrompt(input);
-        if (!output) {
-            throw new Error("The AI First Mate failed to generate a briefing. The model may have returned a null output.");
+        const maxRetries = 3;
+        let attempt = 0;
+        let lastError: any = null;
+
+        while (attempt < maxRetries) {
+            try {
+                const { output } = await briefingPrompt(input);
+                if (!output) {
+                    throw new Error("The AI First Mate failed to generate a briefing. The model returned a null output.");
+                }
+                return output;
+            } catch (e: any) {
+                lastError = e;
+                attempt++;
+                console.warn(`Briefing generation attempt ${attempt} failed. Retrying...`);
+                // Wait for a short period before retrying
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+                }
+            }
         }
-        return output;
+
+        // If all retries fail, throw the last captured error
+        console.error("All retry attempts for briefing generation failed.", lastError);
+        throw new Error(`The AI First Mate failed to generate a briefing after ${maxRetries} attempts. Last error: ${lastError.message}`);
     }
 );
 
