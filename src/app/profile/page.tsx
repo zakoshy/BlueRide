@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import QRCode from 'qrcode';
+import Image from "next/image";
 
 
 // Define types for our data structures
@@ -88,6 +90,7 @@ export default function ProfilePage() {
   // Receipt State
   const [receiptData, setReceiptData] = useState<Booking | null>(null);
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const receiptRef = useRef<HTMLDivElement>(null);
   
   const handlePrint = useReactToPrint({
@@ -97,8 +100,27 @@ export default function ProfilePage() {
     onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
   });
 
-   const handleViewReceipt = (booking: Booking) => {
+   const handleViewReceipt = async (booking: Booking) => {
     setReceiptData(booking);
+
+    // --- Generate QR Code ---
+    const ticketInfo = {
+        bookingId: booking._id,
+        passengerName: user?.displayName,
+        from: booking.pickup,
+        to: booking.destination,
+        fare: booking.finalFare,
+        date: booking.createdAt,
+    };
+    try {
+        const qrUrl = await QRCode.toDataURL(JSON.stringify(ticketInfo));
+        setQrCodeDataUrl(qrUrl);
+    } catch (err) {
+        console.error('Failed to generate QR code', err);
+        setQrCodeDataUrl(''); // Clear any previous QR code
+    }
+    // --- End QR Code Generation ---
+
     setIsReceiptDialogOpen(true);
   };
 
@@ -133,7 +155,8 @@ export default function ProfilePage() {
         const response = await fetch('/api/routes');
         if (response.ok) {
           const data: string[] = await response.json();
-          setPickupOptions(data.map(loc => ({ value: loc, label: loc })));
+          const uniqueOptions = [...new Set(data)].map(loc => ({ value: loc, label: loc }));
+          setPickupOptions(uniqueOptions);
         } else {
           toast({ title: "Error", description: "Could not fetch available pickup locations.", variant: "destructive" });
         }
@@ -593,7 +616,7 @@ export default function ProfilePage() {
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Booking Receipt</DialogTitle>
-                    <DialogDescription>A copy of your booking details. You can print this for your records.</DialogDescription>
+                    <DialogDescription>Your scannable ticket. You can also print this for your records.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                     {/* This inner div is what gets printed */}
@@ -605,6 +628,13 @@ export default function ProfilePage() {
                             </div>
                              <Sailboat className="h-8 w-8 text-primary" />
                         </div>
+
+                        {qrCodeDataUrl && (
+                            <div className="flex justify-center my-4">
+                                <Image src={qrCodeDataUrl} alt="Booking QR Code" width={160} height={160} />
+                            </div>
+                        )}
+
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                                 <p><strong className="font-medium text-muted-foreground">Passenger:</strong></p>
@@ -656,5 +686,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
