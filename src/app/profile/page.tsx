@@ -617,7 +617,7 @@ export default function ProfilePage() {
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Booking Receipt</DialogTitle>
-                    <DialogDescription>Your scannable ticket. You can also print this for your records.</DialogDescription>
+                    <DialogDescription>Your scannable ticket. You can print this or save it as a PDF.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                     {/* This inner div is what gets printed */}
@@ -629,12 +629,6 @@ export default function ProfilePage() {
                             </div>
                              <Sailboat className="h-8 w-8 text-primary" />
                         </div>
-
-                        {qrCodeDataUrl && (
-                            <div className="flex justify-center my-4">
-                                <Image src={qrCodeDataUrl} alt="Booking QR Code" width={160} height={160} />
-                            </div>
-                        )}
 
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -670,6 +664,14 @@ export default function ProfilePage() {
                                 <p className="text-lg font-bold">Ksh {receiptData?.finalFare?.toLocaleString()}</p>
                             </div>
                         </div>
+
+                        {qrCodeDataUrl && (
+                            <div className="flex flex-col items-center my-4 pt-4 border-t">
+                                <p className="text-sm text-muted-foreground mb-2">Scan upon boarding</p>
+                                <Image src={qrCodeDataUrl} alt="Booking QR Code" width={160} height={160} />
+                            </div>
+                        )}
+
                          <div className="text-center mt-6 text-xs text-muted-foreground">
                             <p>Please present this receipt upon boarding. Have a safe and pleasant journey.</p>
                         </div>
@@ -679,7 +681,7 @@ export default function ProfilePage() {
                     <Button variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Close</Button>
                     <Button onClick={handlePrint}>
                         <Printer className="mr-2 h-4 w-4" />
-                        Print Receipt
+                        Print / Download
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -687,3 +689,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
