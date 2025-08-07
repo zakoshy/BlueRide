@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy } from "lucide-react";
+import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,17 +21,23 @@ const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   loading: () => <Skeleton className="h-full w-full rounded-lg" />
 });
 
-interface Trip {
-    _id: string;
-    pickup: { name: string; lat: number; lng: number };
-    destination: { name: string; lat: number; lng: number };
-    status: string;
-    seats?: number;
+interface Passenger {
+    bookingId: string;
+    name: string;
+    uid: string;
     bookingType: 'seat' | 'whole_boat';
-    createdAt: string;
-    rider: { name: string; uid: string };
-    boat: { _id: string; name: string; licenseNumber: string };
+    seats?: number;
 }
+
+interface Journey {
+    _id: string;
+    boat: { _id: string; name: string; licenseNumber: string; };
+    pickup: { name: string; lat: number; lng: number; };
+    destination: { name: string; lat: number; lng: number; };
+    passengers: Passenger[];
+    tripDate: string;
+}
+
 
 export default function CaptainDashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -41,25 +47,25 @@ export default function CaptainDashboardPage() {
   const [isCaptain, setIsCaptain] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [journeys, setJourneys] = useState<Journey[]>([]);
+  const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
 
 
-  const fetchTrips = useCallback(async (captainId: string) => {
+  const fetchJourneys = useCallback(async (captainId: string) => {
     setLoading(true);
     try {
         const response = await fetch(`/api/captain/trips?captainId=${captainId}`);
         if(response.ok) {
             const data = await response.json();
-            setTrips(data);
+            setJourneys(data);
         } else {
-            toast({ title: "Error", description: "Could not fetch assigned trips.", variant: "destructive" });
+            toast({ title: "Error", description: "Could not fetch assigned journeys.", variant: "destructive" });
         }
     } catch (error) {
-        console.error("Error fetching trips:", error);
-        toast({ title: "Error", description: "An unexpected error occurred while fetching trips.", variant: "destructive" });
+        console.error("Error fetching journeys:", error);
+        toast({ title: "Error", description: "An unexpected error occurred while fetching journeys.", variant: "destructive" });
     } finally {
         setLoading(false);
     }
@@ -77,37 +83,35 @@ export default function CaptainDashboardPage() {
        // Admins can view, but fetching might require a specific captain ID.
        // For this dashboard, we'll fetch trips only for actual captains.
       if (profile.role === 'captain') {
-         fetchTrips(user.uid);
+         fetchJourneys(user.uid);
       } else {
          setLoading(false);
       }
     } else {
       router.push('/profile');
     }
-  }, [user, profile, authLoading, router, fetchTrips]);
+  }, [user, profile, authLoading, router, fetchJourneys]);
 
-  const handleSelectTrip = async (trip: Trip) => {
-    // A trip can be selected even if its coordinates are missing.
-    // The map component will handle the case where destination is not available.
-    if (!trip.pickup?.name || !trip.destination?.name) {
+  const handleSelectJourney = async (journey: Journey) => {
+    if (!journey.pickup?.name || !journey.destination?.name) {
         toast({
-            title: "Trip Data Incomplete",
-            description: "This trip is missing location data and cannot be displayed on the map.",
+            title: "Journey Data Incomplete",
+            description: "This journey is missing location data and cannot be displayed on the map.",
             variant: "destructive"
         });
-        setSelectedTrip(trip);
+        setSelectedJourney(journey);
         setBriefing(null);
         return;
     }
 
-    setSelectedTrip(trip);
+    setSelectedJourney(journey);
     setBriefing(null);
     setIsBriefingLoading(true);
 
     try {
         const input: FirstMateInput = {
-            pickup: trip.pickup.name,
-            destination: trip.destination.name
+            pickup: journey.pickup.name,
+            destination: journey.destination.name
         };
         const briefingData = await getFirstMateBriefing(input);
         setBriefing(briefingData);
@@ -159,8 +163,8 @@ export default function CaptainDashboardPage() {
         </div>
     );
   }
-
-  const destination = selectedTrip ? { lat: selectedTrip.pickup.lat, lng: selectedTrip.pickup.lng } : null;
+  
+  const route = briefing ? { pickup: briefing.route.pickup, destination: briefing.route.destination } : null;
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -178,44 +182,50 @@ export default function CaptainDashboardPage() {
         <main className="container mx-auto p-4 sm:p-6 md:p-8">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold">Captain's Dashboard</h1>
-                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned trips. Select one to view the route to your passenger.</p>
+                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned journeys. Select one to view the route and briefing.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 space-y-4">
                      <Card>
                         <CardHeader>
-                            <CardTitle>Trip Manifest</CardTitle>
-                            <CardDescription>Select a trip to view details and route to pickup.</CardDescription>
+                            <CardTitle>Journey Manifest</CardTitle>
+                            <CardDescription>Select a journey to view details and route.</CardDescription>
                         </CardHeader>
                         <CardContent className="max-h-[60vh] overflow-y-auto">
-                            {trips.length > 0 ? (
+                            {journeys.length > 0 ? (
                                 <div className="space-y-3">
-                                {trips.map(trip => (
-                                    <button key={trip._id} onClick={() => handleSelectTrip(trip)} className={`w-full text-left p-3 rounded-lg border transition-all ${selectedTrip?._id === trip._id ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'}`}>
-                                        <p className="font-semibold">{trip.boat.name}</p>
-                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> From: <span className="font-medium">{trip.pickup.name || 'Unknown'}</span></p>
-                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> To: <span className="font-medium">{trip.destination.name || 'Unknown'}</span></p>
-                                        <p className="text-sm text-muted-foreground">Rider: {trip.rider.name}</p>
-                                        <Badge variant="outline" className="mt-1">{trip.bookingType === 'seat' ? `${trip.seats} Seat(s)` : `Whole Boat`}</Badge>
+                                {journeys.map(journey => (
+                                    <button key={journey._id} onClick={() => handleSelectJourney(journey)} className={`w-full text-left p-4 rounded-lg border transition-all ${selectedJourney?._id === journey._id ? 'bg-primary/10 border-primary shadow-lg' : 'hover:bg-muted/50'}`}>
+                                        <p className="font-semibold">{journey.boat.name}</p>
+                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> From: <span className="font-medium">{journey.pickup.name || 'Unknown'}</span></p>
+                                        <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> To: <span className="font-medium">{journey.destination.name || 'Unknown'}</span></p>
+                                        <div className="mt-2">
+                                            <p className="text-xs font-semibold flex items-center gap-1"><Users size={14}/>Passenger Manifest ({journey.passengers.length})</p>
+                                            <div className="text-xs text-muted-foreground pl-2 border-l ml-1">
+                                            {journey.passengers.map(p => (
+                                                <div key={p.bookingId}>{p.name} ({p.bookingType === 'seat' ? `${p.seats} seat(s)` : 'Whole boat'})</div>
+                                            ))}
+                                            </div>
+                                        </div>
                                     </button>
                                 ))}
                                 </div>
                             ) : (
-                                <p className="text-center text-muted-foreground py-8">No trips assigned.</p>
+                                <p className="text-center text-muted-foreground py-8">No journeys assigned.</p>
                             )}
                         </CardContent>
                      </Card>
                 </div>
 
                 <div className="lg:col-span-2 space-y-4">
-                    <div className="h-[50vh] w-full">
+                    <div className="h-[50vh] w-full rounded-lg overflow-hidden shadow-lg">
                          <InteractiveMap 
-                            key={selectedTrip?._id || 'no-trip'} 
-                            destination={destination}
+                            key={selectedJourney?._id || 'no-journey'} 
+                            route={route}
                          />
                     </div>
-                    {selectedTrip && isBriefingLoading && (
+                    {selectedJourney && isBriefingLoading && (
                         <Card>
                             <CardHeader><CardTitle>Loading First Mate Briefing...</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
@@ -225,11 +235,11 @@ export default function CaptainDashboardPage() {
                             </CardContent>
                         </Card>
                     )}
-                    {briefing && selectedTrip && (
+                    {briefing && selectedJourney && (
                          <Card>
                             <CardHeader>
-                                <CardTitle>Passenger Trip Briefing: {selectedTrip.pickup.name} to {selectedTrip.destination.name}</CardTitle>
-                                <CardDescription>Your AI-powered summary for the upcoming trip with the passenger.</CardDescription>
+                                <CardTitle>Journey Briefing: {selectedJourney.pickup.name} to {selectedJourney.destination.name}</CardTitle>
+                                <CardDescription>Your AI-powered summary for the upcoming trip.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div>
@@ -246,14 +256,14 @@ export default function CaptainDashboardPage() {
                                 </div>
 
                                 <div className="pt-4 flex justify-end gap-2">
-                                     <Button variant="outline"><CheckSquare className="mr-2"/>Start Passenger Trip</Button>
+                                     <Button variant="outline"><CheckSquare className="mr-2"/>Start Journey</Button>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
-                     {!selectedTrip && (
+                     {!selectedJourney && (
                         <Card className="flex items-center justify-center h-48">
-                            <p className="text-muted-foreground">Please select a trip to view route to passenger.</p>
+                            <p className="text-muted-foreground">Please select a journey to view its route and briefing.</p>
                         </Card>
                     )}
                 </div>

@@ -33,7 +33,7 @@ export async function GET(request: Request) {
             }
         },
         { 
-            $sort: { createdAt: 1 } // Show oldest trips first
+            $sort: { createdAt: 1 } // Process oldest bookings first
         },
         {
             $lookup: {
@@ -76,39 +76,59 @@ export async function GET(request: Request) {
         {
             $unwind: { path: "$pickupLocation", preserveNullAndEmptyArrays: true }
         },
-         {
+        {
             $unwind: { path: "$destinationLocation", preserveNullAndEmptyArrays: true }
         },
+        // Group by the actual journey (boat, pickup, destination)
+        {
+            $group: {
+                _id: {
+                    boatId: "$boatInfo._id",
+                    pickup: "$pickup",
+                    destination: "$destination"
+                },
+                boat: { $first: "$boatInfo" },
+                pickupLocation: { $first: "$pickupLocation" },
+                destinationLocation: { $first: "$destinationLocation" },
+                passengers: { 
+                    $push: {
+                        bookingId: "$_id",
+                        name: "$riderInfo.name",
+                        uid: "$riderInfo.uid",
+                        bookingType: "$bookingType",
+                        seats: "$seats"
+                    }
+                },
+                earliestBookingTime: { $min: "$createdAt" }
+            }
+        },
+        // Reshape the output
         {
             $project: {
-                _id: 1,
-                status: 1,
-                seats: 1,
-                bookingType: 1,
-                createdAt: 1,
-                rider: {
-                    name: "$riderInfo.name",
-                    uid: "$riderInfo.uid"
-                },
+                _id: { $concat: [ { $toString: "$_id.boatId" }, "-", "$_id.pickup", "-", "$_id.destination" ] },
                 boat: {
-                    _id: "$boatInfo._id",
-                    name: "$boatInfo.name",
-                    licenseNumber: "$boatInfo.licenseNumber"
+                    _id: "$boat._id",
+                    name: "$boat.name",
+                    licenseNumber: "$boat.licenseNumber"
                 },
-                 pickup: {
-                    name: "$pickup",
+                pickup: {
+                    name: "$_id.pickup",
                     lat: "$pickupLocation.lat",
                     lng: "$pickupLocation.lng"
                 },
                 destination: {
-                    name: "$destination",
+                    name: "$_id.destination",
                     lat: "$destinationLocation.lat",
                     lng: "$destinationLocation.lng"
-                }
+                },
+                passengers: 1,
+                tripDate: "$earliestBookingTime"
             }
+        },
+        {
+            $sort: { tripDate: 1 } // Sort journeys by the earliest booking time
         }
     ]).toArray();
-
 
     return NextResponse.json(bookings, { status: 200 });
   } catch (error) {
@@ -116,5 +136,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
-
     
