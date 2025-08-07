@@ -177,11 +177,6 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from');
-
-    // Run seeder on first load or when explicitly told to
-    if (process.env.NODE_ENV === 'development') {
-       await seedNewData();
-    }
     
     const client = await clientPromise;
     const db = client.db();
@@ -192,7 +187,7 @@ export async function GET(request: Request) {
         const destinations = await routesCollection.find({ from }).project({ to: 1, _id: 0 }).toArray();
         return NextResponse.json(destinations.map(d => d.to), { status: 200 });
     } else {
-        // Return all unique pickup points
+        // Return all unique pickup points using the correct distinct method
         const pickupPoints = await routesCollection.distinct('from');
         return NextResponse.json(pickupPoints, { status: 200 });
     }
@@ -202,4 +197,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
-
