@@ -20,6 +20,7 @@ import { useReactToPrint } from 'react-to-print';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Separator } from "@/components/ui/separator";
 
 
 // Define types for our data structures
@@ -83,18 +84,22 @@ export default function ProfilePage() {
   // Bookings History
   const [userBookings, setUserBookings] = useState<Booking[]>([]);
   const [isFetchingBookings, setIsFetchingBookings] = useState(false);
+  
+  // Receipt State
   const [receiptData, setReceiptData] = useState<Booking | null>(null);
+  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
-
+  
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
+    documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
+    onAfterPrint: () => toast({ title: "Print Complete", description: "Your receipt has been sent to the printer."}),
+    onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
   });
 
    const handleViewReceipt = (booking: Booking) => {
     setReceiptData(booking);
-    setTimeout(() => {
-        handlePrint();
-    }, 100);
+    setIsReceiptDialogOpen(true);
   };
 
   useEffect(() => {
@@ -128,8 +133,7 @@ export default function ProfilePage() {
         const response = await fetch('/api/routes');
         if (response.ok) {
           const data: string[] = await response.json();
-          const uniqueData = [...new Set(data)];
-          setPickupOptions(uniqueData.map(loc => ({ value: loc, label: loc })));
+          setPickupOptions(data.map(loc => ({ value: loc, label: loc })));
         } else {
           toast({ title: "Error", description: "Could not fetch available pickup locations.", variant: "destructive" });
         }
@@ -413,7 +417,7 @@ export default function ProfilePage() {
                 <Card className="mt-6">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><BookCopy/>Your Booking History</CardTitle>
-                        <CardDescription>Here are all your past and upcoming trips. You can print your receipt from here.</CardDescription>
+                        <CardDescription>Here are all your past and upcoming trips. You can view or print your receipt from here.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {isFetchingBookings ? (
@@ -430,39 +434,34 @@ export default function ProfilePage() {
                                             <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
                                             <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
                                             {booking.finalFare && <p className="text-xs font-bold">Fare: Ksh {booking.finalFare.toLocaleString()}</p>}
-                                             {booking.bookingType === 'seat' && booking.boat?.capacity && booking.seats ? (
-                                                <p className="text-xs text-muted-foreground">
-                                                   Seats remaining: {booking.boat.capacity - booking.seats}
-                                                </p>
-                                            ) : null}
                                         </div>
                                          <div className="flex items-center gap-2 self-end sm:self-center">
                                             <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
                                              {(booking.status === 'confirmed' || booking.status === 'completed') && (
-                                                <Button variant="outline" size="icon" onClick={() => handleViewReceipt(booking)}>
-                                                    <Printer className="h-4 w-4"/>
-                                                    <span className="sr-only">View Receipt</span>
+                                                <Button variant="outline" size="sm" onClick={() => handleViewReceipt(booking)}>
+                                                    <Printer className="mr-2 h-4 w-4"/>
+                                                    View Receipt
                                                 </Button>
                                              )}
-                                            {(booking.status === 'confirmed' || booking.status === 'rejected') && (
+                                            {(booking.status !== 'completed' && booking.status !== 'cancelled') && (
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button variant="destructive" size="icon">
                                                         <Trash2 className="h-4 w-4" />
-                                                        <span className="sr-only">{booking.status === 'confirmed' ? 'Cancel Booking' : 'Delete Booking'}</span>
+                                                        <span className="sr-only">Cancel Booking</span>
                                                     </Button>
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader>
                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                     <AlertDialogDescription>
-                                                        This action cannot be undone. This will permanently remove this booking.
+                                                        This will permanently cancel your booking. This action cannot be undone.
                                                     </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
                                                     <AlertDialogCancel>Go Back</AlertDialogCancel>
                                                     <AlertDialogAction onClick={() => handleCancelBooking(booking._id)}>
-                                                        Yes, Proceed
+                                                        Yes, Cancel Booking
                                                     </AlertDialogAction>
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
@@ -588,50 +587,72 @@ export default function ProfilePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        
+        {/* Receipt Dialog */}
+        <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Booking Receipt</DialogTitle>
+                    <DialogDescription>A copy of your booking details. You can print this for your records.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    {/* This inner div is what gets printed */}
+                    <div ref={receiptRef} className="p-4 rounded-lg border bg-background text-foreground">
+                        <div className="flex justify-between items-center pb-4 mb-4 border-b">
+                            <div>
+                                <h3 className="text-xl font-bold text-primary">BlueRide</h3>
+                                <p className="text-xs text-muted-foreground">Thank you for riding with us!</p>
+                            </div>
+                             <Sailboat className="h-8 w-8 text-primary" />
+                        </div>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <p><strong className="font-medium text-muted-foreground">Passenger:</strong></p>
+                                <p className="text-right">{user?.displayName}</p>
+                                
+                                <p><strong className="font-medium text-muted-foreground">Booking ID:</strong></p>
+                                <p className="text-right font-mono text-xs">{receiptData?._id}</p>
+                                
+                                <p><strong className="font-medium text-muted-foreground">Boat Name:</strong></p>
+                                <p className="text-right">{receiptData?.boat?.name}</p>
 
-        {/* Hidden printable receipt component */}
-        <div className="hidden">
-            {receiptData && (
-                 <div ref={receiptRef} className="p-10 font-sans">
-                    <div className="border-b-2 border-dashed pb-6 mb-6">
-                        <div className="flex justify-between items-center">
-                            <h1 className="text-4xl font-bold text-gray-800">BlueRide</h1>
-                            <h2 className="text-2xl font-semibold">Booking Receipt</h2>
+                                <p><strong className="font-medium text-muted-foreground">Date:</strong></p>
+                                <p className="text-right">{receiptData ? new Date(receiptData.createdAt).toLocaleString() : 'N/A'}</p>
+                            </div>
+                            <Separator />
+                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <p><strong className="font-medium text-muted-foreground">From:</strong></p>
+                                <p className="text-right font-semibold">{receiptData?.pickup}</p>
+                                <p><strong className="font-medium text-muted-foreground">To:</strong></p>
+                                <p className="text-right font-semibold">{receiptData?.destination}</p>
+                             </div>
+                             <Separator/>
+                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <p><strong className="font-medium text-muted-foreground">Booking Type:</strong></p>
+                                <p className="text-right">{receiptData?.bookingType === 'seat' ? `Seat(s): ${receiptData.seats}` : 'Whole Boat'}</p>
+                                
+                                <p><strong className="font-medium text-muted-foreground">Status:</strong></p>
+                                <p className="text-right capitalize font-bold">{receiptData?.status}</p>
+                            </div>
+                            <div className="bg-muted/50 rounded-lg p-3 mt-4 flex justify-between items-center">
+                                <p className="text-lg font-bold">Total Fare Paid:</p>
+                                <p className="text-lg font-bold">Ksh {receiptData?.finalFare?.toLocaleString()}</p>
+                            </div>
                         </div>
-                        <p className="text-sm text-gray-500">Your reliable water ride.</p>
-                    </div>
-                    <div className="mb-8">
-                        <h3 className="text-lg font-bold mb-2">Trip Details</h3>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                            <div><strong className="font-medium text-gray-600">Passenger:</strong> {user?.displayName}</div>
-                            <div><strong className="font-medium text-gray-600">Booking ID:</strong> {receiptData._id}</div>
-                            <div><strong className="font-medium text-gray-600">Boat Name:</strong> {receiptData.boat?.name}</div>
-                            <div><strong className="font-medium text-gray-600">Date:</strong> {new Date(receiptData.createdAt).toLocaleString()}</div>
-                        </div>
-                    </div>
-                     <div className="mb-8">
-                        <h3 className="text-lg font-bold mb-2">Route Information</h3>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                            <div><strong className="font-medium text-gray-600">From:</strong> {receiptData.pickup}</div>
-                            <div><strong className="font-medium text-gray-600">To:</strong> {receiptData.destination}</div>
-                        </div>
-                    </div>
-                     <div className="mb-8 border-t pt-4">
-                        <h3 className="text-lg font-bold mb-2">Booking Summary</h3>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                            <div><strong className="font-medium text-gray-600">Type:</strong> {receiptData.bookingType === 'seat' ? 'Seat Booking' : 'Whole Boat Charter'}</div>
-                            {receiptData.seats && <div><strong className="font-medium text-gray-600">Seats:</strong> {receiptData.seats}</div>}
-                            <div><strong className="font-medium text-gray-600">Status:</strong> <span className="font-bold uppercase text-green-600">{receiptData.status}</span></div>
-                            {receiptData.finalFare && <div><strong className="font-medium text-gray-600">Final Fare:</strong> <span className="font-bold">Ksh {receiptData.finalFare.toLocaleString()}</span></div>}
+                         <div className="text-center mt-6 text-xs text-muted-foreground">
+                            <p>Please present this receipt upon boarding. Have a safe and pleasant journey.</p>
                         </div>
                     </div>
-                    <div className="text-center mt-10 border-t-2 border-dashed pt-6">
-                        <p className="font-semibold">Thank you for choosing BlueRide!</p>
-                        <p className="text-sm text-muted-foreground mt-2">Please present this receipt upon boarding. Have a safe and pleasant journey.</p>
-                    </div>
-                 </div>
-            )}
-        </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Close</Button>
+                    <Button onClick={handlePrint}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print Receipt
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
