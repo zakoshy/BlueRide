@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users } from "lucide-react";
+import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,6 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 import type { FirstMateOutput, FirstMateInput } from "@/ai/flows/first-mate-flow";
 import { getFirstMateBriefing } from "@/ai/flows/first-mate-flow";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { auth } from "@/lib/firebase/config";
+import { signOut } from "firebase/auth";
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   ssr: false,
@@ -122,6 +126,20 @@ export default function CaptainDashboardPage() {
         setIsBriefingLoading(false);
     }
   };
+  
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/');
+  };
+
+  const getInitials = (name?: string | null) => {
+    if (!name) return "";
+    const names = name.split(' ');
+    if (names.length > 1) {
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }
 
 
   if (authLoading || loading) {
@@ -169,13 +187,44 @@ export default function CaptainDashboardPage() {
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
        <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex h-14 items-center">
+            <div className="container flex h-14 items-center justify-between">
                 <Link href="/" className="mr-6 flex items-center space-x-2">
                     <Sailboat className="h-6 w-6 text-primary" />
                     <span className="font-bold sm:inline-block">
                     BlueRide Captain
                     </span>
                 </Link>
+                <nav className="flex items-center gap-2">
+                 {loading || !user ? (
+                  <div className="h-10 w-28 animate-pulse rounded-md bg-muted" />
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User'} />
+                          <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+                        </Avatar>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end" forceMount>
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                          <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                          </p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </nav>
             </div>
         </header>
         
