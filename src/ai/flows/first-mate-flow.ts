@@ -145,38 +145,11 @@ const briefingFlow = ai.defineFlow(
         outputSchema: FirstMateOutputSchema,
     },
     async (input) => {
-        const maxRetries = 3;
-        let attempt = 0;
-        let lastError: any = null;
-
-        while (attempt < maxRetries) {
-            try {
-                const { output } = await briefingPrompt(input);
-                if (!output) {
-                    throw new Error("The AI First Mate failed to generate a briefing. The model returned a null output.");
-                }
-                // Validate that the route object and its coordinates are present
-                if (!output.route || !output.route.pickup || !output.route.destination ||
-                    !output.route.pickup.lat || !output.route.pickup.lng ||
-                    !output.route.destination.lat || !output.route.destination.lng
-                ) {
-                   throw new Error("The AI First Mate failed to return valid route coordinates.");
-                }
-                return output;
-            } catch (e: any) {
-                lastError = e;
-                attempt++;
-                console.warn(`Briefing generation attempt ${attempt} failed: ${e.message}. Retrying...`);
-                // Wait for a short period before retrying
-                if (attempt < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
-                }
-            }
+        const { output } = await briefingPrompt(input);
+        if (!output) {
+            throw new Error("The AI First Mate failed to generate a briefing. The model returned a null output.");
         }
-
-        // If all retries fail, throw the last captured error
-        console.error("All retry attempts for briefing generation failed.", lastError);
-        throw new Error(`The AI First Mate failed to generate a briefing after ${maxRetries} attempts. Last error: ${lastError.message}`);
+        return output;
     }
 );
 
