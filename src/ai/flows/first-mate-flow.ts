@@ -53,21 +53,23 @@ const getLocationCoordinates = ai.defineTool(
         outputSchema: CoordinatesSchema,
     },
     async ({ locationName }) => {
+        console.log(`Searching for location: ${locationName}`);
         try {
             const client = await clientPromise;
             const db = client.db();
-            const location = await db.collection('locations').findOne({ name: { $regex: new RegExp(`^${locationName}$`, 'i') } });
+            // Use a case-insensitive regex for a more flexible search
+            const location = await db.collection('locations').findOne({ name: { $regex: new RegExp(locationName, 'i') } });
+            
             if (!location) {
-                // Let's try a more flexible search if exact match fails
-                 const flexibleLocation = await db.collection('locations').findOne({ name: { $regex: new RegExp(locationName, 'i') } });
-                 if(!flexibleLocation) {
-                    throw new Error(`Location not found: ${locationName}`);
-                 }
-                 return { lat: flexibleLocation.lat, lng: flexibleLocation.lng };
+                console.error(`Location not found in DB: ${locationName}`);
+                throw new Error(`Location not found: ${locationName}`);
             }
+            
+            console.log(`Found location: ${location.name} at ${location.lat}, ${location.lng}`);
             return { lat: location.lat, lng: location.lng };
         } catch (error) {
-            console.error("Error fetching location from DB:", error);
+            console.error(`Error fetching location from DB for "${locationName}":`, error);
+            // Re-throw the error to be handled by the flow
             throw new Error(`Failed to retrieve location data for ${locationName}.`);
         }
     }
@@ -127,7 +129,7 @@ const briefingPrompt = ai.definePrompt({
     prompt: `You are an AI First Mate for a water taxi captain in coastal Kenya. Your job is to provide a concise, professional pre-trip briefing.
 
     The captain has provided a pickup and destination location.
-    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for BOTH the pickup and destination points.
+    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for BOTH the pickup and destination points. This is a mandatory step.
     2.  Use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather. If the weather service is unavailable, note that in your advice.
     3.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves, no wind means calm). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
     4.  Provide brief, actionable navigation advice based on the route and the weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
@@ -145,11 +147,28 @@ const briefingFlow = ai.defineFlow(
         outputSchema: FirstMateOutputSchema,
     },
     async (input) => {
-        const { output } = await briefingPrompt(input);
-        if (!output) {
-            throw new Error("The AI First Mate failed to generate a briefing. The model returned a null output.");
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            try {
+                const { output } = await briefingPrompt(input);
+                // Add validation to ensure coordinates are present
+                if (output?.route?.pickup?.lat && output?.route?.destination?.lat) {
+                    console.log("Successfully generated briefing with valid coordinates.");
+                    return output;
+                }
+                console.warn(`Attempt ${attempts}: AI output was missing coordinates. Retrying...`);
+            } catch (error) {
+                console.error(`Attempt ${attempts} failed with error:`, error);
+                if (attempts >= maxAttempts) {
+                    throw new Error("The AI First Mate failed to generate a valid briefing after multiple attempts.");
+                }
+            }
         }
-        return output;
+        // This part should not be reachable, but as a fallback:
+        throw new Error("The AI First Mate failed to generate a briefing. The model returned a null or invalid output.");
     }
 );
 
