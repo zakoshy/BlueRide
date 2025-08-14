@@ -120,6 +120,14 @@ export default function CaptainDashboardPage() {
         if (briefingData.route) {
             setRoute(briefingData.route);
         }
+        if(briefingData.weather.wind.includes("unavailable")) {
+            toast({
+                title: "Weather Unavailable",
+                description: "The live weather forecast could not be retrieved. Please check your OpenWeatherMap API key.",
+                variant: "destructive",
+                duration: 9000,
+            })
+        }
 
     } catch (error) {
         console.error("Error fetching briefing:", error);
@@ -320,4 +328,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-

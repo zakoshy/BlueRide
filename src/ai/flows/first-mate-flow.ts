@@ -58,7 +58,7 @@ const getLocationCoordinates = ai.defineTool(
             const client = await clientPromise;
             const db = client.db();
             // Use a case-insensitive regex for a more flexible search
-            const location = await db.collection('locations').findOne({ name: { $regex: new RegExp(locationName, 'i') } });
+            const location = await db.collection('locations').findOne({ name: { $regex: new RegExp(`^${locationName}$`, 'i') } });
             
             if (!location) {
                 console.error(`Location not found in DB: ${locationName}`);
@@ -92,17 +92,16 @@ const getRealTimeWeather = ai.defineTool(
         const apiKey = process.env.OPENWEATHERMAP_API_KEY;
         if (!apiKey) {
             console.warn("OpenWeatherMap API key is not configured.");
-            // Return default/unavailable data instead of throwing an error
             return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
         }
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric`;
         try {
             const response = await fetch(url);
             if (!response.ok) {
-                 const errorBody = await response.text();
-                console.error(`Failed to fetch weather data. Status: ${response.status}. Body: ${errorBody}`);
-                // Return default/unavailable data on API error
-                return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
+                 const errorData = await response.json();
+                 console.error(`Failed to fetch weather data. Status: ${response.status}. Message: ${errorData.message}`);
+                 // Pass back a clear indicator of failure
+                 return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
             }
             const data = await response.json();
             return {
@@ -113,7 +112,6 @@ const getRealTimeWeather = ai.defineTool(
             };
         } catch (error) {
             console.error("Error fetching weather data:", error);
-             // Return default/unavailable data on network or other errors
             return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
         }
     }
