@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
+import InteractiveMap from "@/components/interactive-map";
 
 interface Passenger {
     bookingId: string;
@@ -49,6 +50,7 @@ export default function CaptainDashboardPage() {
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
+  const [route, setRoute] = useState<{ pickup: { lat: number; lng: number }; destination: { lat: number; lng: number } } | null>(null);
 
 
   const fetchJourneys = useCallback(async (captainId: string) => {
@@ -99,11 +101,13 @@ export default function CaptainDashboardPage() {
         });
         setSelectedJourney(journey);
         setBriefing(null);
+        setRoute(null);
         return;
     }
 
     setSelectedJourney(journey);
     setBriefing(null);
+    setRoute(null);
     setIsBriefingLoading(true);
 
     try {
@@ -113,6 +117,10 @@ export default function CaptainDashboardPage() {
         };
         const briefingData = await getFirstMateBriefing(input);
         setBriefing(briefingData);
+        if (briefingData.route) {
+            setRoute(briefingData.route);
+        }
+
     } catch (error) {
         console.error("Error fetching briefing:", error);
         toast({ title: "Briefing Error", description: "Could not get AI First Mate briefing for this trip.", variant: "destructive" });
@@ -260,7 +268,11 @@ export default function CaptainDashboardPage() {
                 </div>
 
                 <div className="lg:col-span-2 space-y-4">
-                    {selectedJourney && isBriefingLoading && (
+                     <Card className="h-96">
+                        <InteractiveMap route={route} />
+                     </Card>
+                    
+                    {isBriefingLoading && !briefing && (
                         <Card>
                             <CardHeader><CardTitle>Loading First Mate Briefing...</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
@@ -270,6 +282,7 @@ export default function CaptainDashboardPage() {
                             </CardContent>
                         </Card>
                     )}
+
                     {briefing && selectedJourney && (
                          <Card>
                             <CardHeader>
@@ -296,15 +309,15 @@ export default function CaptainDashboardPage() {
                             </CardContent>
                         </Card>
                     )}
-                     {!selectedJourney && (
-                        <Card className="flex items-center justify-center h-48 lg:h-full">
-                            <p className="text-muted-foreground">Please select a journey to view its briefing.</p>
+                     {!selectedJourney && !isBriefingLoading && (
+                         <Card className="flex items-center justify-center min-h-48">
+                            <p className="text-muted-foreground">Please select a journey to view its briefing and route.</p>
                         </Card>
                     )}
                 </div>
             </div>
-
         </main>
     </div>
   );
 }
+

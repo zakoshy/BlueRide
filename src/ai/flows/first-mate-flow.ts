@@ -32,9 +32,15 @@ const WeatherSchema = z.object({
     visibility: z.string().describe("Visibility, e.g., 'Clear, 10+ nautical miles'.")
 });
 
+const RouteSchema = z.object({
+    pickup: CoordinatesSchema,
+    destination: CoordinatesSchema,
+});
+
 const FirstMateOutputSchema = z.object({
   weather: WeatherSchema.describe("A realistic marine weather forecast for the area."),
-  advice: z.string().describe("Concise, helpful navigation advice for the captain based on the route and weather. Mention any potential hazards or points of interest.")
+  advice: z.string().describe("Concise, helpful navigation advice for the captain based on the route and weather. Mention any potential hazards or points of interest."),
+  route: RouteSchema.optional().describe("The latitude and longitude for the pickup and destination locations.")
 });
 export type FirstMateOutput = z.infer<typeof FirstMateOutputSchema>;
 
@@ -123,11 +129,12 @@ const briefingPrompt = ai.definePrompt({
     prompt: `You are an AI First Mate for a water taxi captain in coastal Kenya. Your job is to provide a concise, professional pre-trip briefing.
 
     The captain has provided a pickup and destination location.
-    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for the *destination* point. This is a mandatory step.
-    2.  Use the 'getRealTimeWeather' tool with the destination's coordinates to get the live weather. If the weather service is unavailable, note that in your advice.
-    3.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves, no wind means calm). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
-    4.  Provide brief, actionable navigation advice based on the route and the weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
-    5.  Return all the required data in the specified JSON format.
+    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for BOTH the pickup and the destination. This is mandatory.
+    2.  Populate the 'route' field in the output with the coordinates for both pickup and destination.
+    3.  Use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather. If the weather service is unavailable, note that in your advice.
+    4.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves, no wind means calm). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
+    5.  Provide brief, actionable navigation advice based on the route and the weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
+    6.  Return all the required data in the specified JSON format.
 
     Pickup: {{{pickup}}}
     Destination: {{{destination}}}
@@ -148,11 +155,12 @@ const briefingFlow = ai.defineFlow(
             attempts++;
             try {
                 const { output } = await briefingPrompt(input);
-                if (output) {
-                    console.log("Successfully generated briefing.");
+                // Add validation to ensure route is present
+                if (output && output.route?.pickup && output.route?.destination) {
+                    console.log("Successfully generated briefing with valid route.");
                     return output;
                 }
-                console.warn(`Attempt ${attempts}: AI output was null. Retrying...`);
+                console.warn(`Attempt ${attempts}: AI output was null or missing route information. Retrying...`);
             } catch (error) {
                 console.error(`Attempt ${attempts} failed with error:`, error);
                 if (attempts >= maxAttempts) {
