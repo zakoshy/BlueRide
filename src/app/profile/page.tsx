@@ -155,7 +155,6 @@ export default function ProfilePage() {
         const response = await fetch('/api/routes');
         if (response.ok) {
           const data: string[] = await response.json();
-          // Use a Set to ensure unique locations before mapping
           const uniqueOptions = [...new Set(data)].map(loc => ({ value: loc, label: loc }));
           setPickupOptions(uniqueOptions);
         } else {
@@ -165,9 +164,10 @@ export default function ProfilePage() {
         toast({ title: "Error", description: "An unexpected error occurred while fetching locations.", variant: "destructive" });
       }
     };
+
     fetchPickupLocations();
     fetchUserBookings();
-  }, [toast, fetchUserBookings]);
+  }, [fetchUserBookings]);
 
   // Fetch destinations when pickup changes
   useEffect(() => {
@@ -688,5 +688,5 @@ export default function ProfilePage() {
         </Dialog>
     </div>
   );
-}
 
+    
