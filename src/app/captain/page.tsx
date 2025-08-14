@@ -9,7 +9,6 @@ import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare,
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { FirstMateOutput, FirstMateInput } from "@/ai/flows/first-mate-flow";
@@ -19,11 +18,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
-
-const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
-  ssr: false,
-  loading: () => <Skeleton className="h-full w-full rounded-lg" />
-});
 
 interface Passenger {
     bookingId: string;
@@ -100,7 +94,7 @@ export default function CaptainDashboardPage() {
     if (!journey.pickup?.name || !journey.destination?.name) {
         toast({
             title: "Journey Data Incomplete",
-            description: "This journey is missing location data and cannot be displayed on the map.",
+            description: "This journey is missing location data and cannot be displayed.",
             variant: "destructive"
         });
         setSelectedJourney(journey);
@@ -182,8 +176,6 @@ export default function CaptainDashboardPage() {
     );
   }
   
-  const route = briefing ? { pickup: briefing.route.pickup, destination: briefing.route.destination } : null;
-
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
        <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -231,7 +223,7 @@ export default function CaptainDashboardPage() {
         <main className="container mx-auto p-4 sm:p-6 md:p-8">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold">Captain's Dashboard</h1>
-                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned journeys. Select one to view the route and briefing.</p>
+                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned journeys. Select one to view the briefing.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -239,7 +231,7 @@ export default function CaptainDashboardPage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Journey Manifest</CardTitle>
-                            <CardDescription>Select a journey to view details and route.</CardDescription>
+                            <CardDescription>Select a journey to view briefing.</CardDescription>
                         </CardHeader>
                         <CardContent className="max-h-[60vh] overflow-y-auto">
                             {journeys.length > 0 ? (
@@ -268,12 +260,6 @@ export default function CaptainDashboardPage() {
                 </div>
 
                 <div className="lg:col-span-2 space-y-4">
-                    <div className="h-[50vh] w-full rounded-lg overflow-hidden shadow-lg">
-                         <InteractiveMap 
-                            key={selectedJourney?._id || 'no-journey'} 
-                            route={route}
-                         />
-                    </div>
                     {selectedJourney && isBriefingLoading && (
                         <Card>
                             <CardHeader><CardTitle>Loading First Mate Briefing...</CardTitle></CardHeader>
@@ -293,7 +279,7 @@ export default function CaptainDashboardPage() {
                             <CardContent className="space-y-4">
                                 <div>
                                     <h3 className="font-semibold text-lg mb-2 flex items-center gap-2"><Cloudy/> Weather Forecast</h3>
-                                    <div className="grid grid-cols-3 gap-2 text-sm">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                                         <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg"><Wind size={16}/> <strong>Wind:</strong> {briefing.weather.wind}</div>
                                         <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg"><Sailboat size={16}/> <strong>Waves:</strong> {briefing.weather.waves}</div>
                                         <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg"><Eye size={16}/> <strong>Visibility:</strong> {briefing.weather.visibility}</div>
@@ -311,8 +297,8 @@ export default function CaptainDashboardPage() {
                         </Card>
                     )}
                      {!selectedJourney && (
-                        <Card className="flex items-center justify-center h-48">
-                            <p className="text-muted-foreground">Please select a journey to view its route and briefing.</p>
+                        <Card className="flex items-center justify-center h-48 lg:h-full">
+                            <p className="text-muted-foreground">Please select a journey to view its briefing.</p>
                         </Card>
                     )}
                 </div>

@@ -26,11 +26,6 @@ const CoordinatesSchema = z.object({
     lng: z.number().describe("Longitude of the location.")
 });
 
-const RouteSchema = z.object({
-    pickup: CoordinatesSchema,
-    destination: CoordinatesSchema
-});
-
 const WeatherSchema = z.object({
     wind: z.string().describe("Wind conditions, e.g., '10 knots from SW'."),
     waves: z.string().describe("Wave conditions, e.g., '1-2 foot swells'."),
@@ -38,7 +33,6 @@ const WeatherSchema = z.object({
 });
 
 const FirstMateOutputSchema = z.object({
-  route: RouteSchema.describe("The latitude and longitude for the trip's start and end points."),
   weather: WeatherSchema.describe("A realistic marine weather forecast for the area."),
   advice: z.string().describe("Concise, helpful navigation advice for the captain based on the route and weather. Mention any potential hazards or points of interest.")
 });
@@ -129,11 +123,11 @@ const briefingPrompt = ai.definePrompt({
     prompt: `You are an AI First Mate for a water taxi captain in coastal Kenya. Your job is to provide a concise, professional pre-trip briefing.
 
     The captain has provided a pickup and destination location.
-    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for BOTH the pickup and destination points. This is a mandatory step.
-    2.  Use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather. If the weather service is unavailable, note that in your advice.
+    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for the *destination* point. This is a mandatory step.
+    2.  Use the 'getRealTimeWeather' tool with the destination's coordinates to get the live weather. If the weather service is unavailable, note that in your advice.
     3.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves, no wind means calm). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
     4.  Provide brief, actionable navigation advice based on the route and the weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
-    5.  Return all the required data in the specified JSON format. Crucially, the 'route' field in your response MUST contain the latitude and longitude for both the pickup and destination points you found in step 1.
+    5.  Return all the required data in the specified JSON format.
 
     Pickup: {{{pickup}}}
     Destination: {{{destination}}}
@@ -154,12 +148,11 @@ const briefingFlow = ai.defineFlow(
             attempts++;
             try {
                 const { output } = await briefingPrompt(input);
-                // Add validation to ensure coordinates are present
-                if (output?.route?.pickup?.lat && output?.route?.destination?.lat) {
-                    console.log("Successfully generated briefing with valid coordinates.");
+                if (output) {
+                    console.log("Successfully generated briefing.");
                     return output;
                 }
-                console.warn(`Attempt ${attempts}: AI output was missing coordinates. Retrying...`);
+                console.warn(`Attempt ${attempts}: AI output was null. Retrying...`);
             } catch (error) {
                 console.error(`Attempt ${attempts} failed with error:`, error);
                 if (attempts >= maxAttempts) {
