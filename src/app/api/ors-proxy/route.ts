@@ -1,10 +1,4 @@
-
 import { NextResponse } from 'next/server';
-import { config } from 'dotenv';
-
-config({ path: '.env' });
-config({ path: '.env.local', override: true });
-
 
 export async function POST(request: Request) {
     const ORS_API_KEY = process.env.OPENROUTERSERVICE_API_KEY;
