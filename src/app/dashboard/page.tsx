@@ -166,7 +166,7 @@ export default function DashboardPage() {
     }
     if (!user || !profile) {
       if (!authLoading) {
-        router.push('/login');
+        window.location.href = '/login';
       }
       return;
     }
@@ -175,9 +175,9 @@ export default function DashboardPage() {
       setIsOwner(true);
       fetchOwnerData(user);
     } else {
-      router.push('/profile');
+        window.location.href = '/profile';
     }
-  }, [user, profile, authLoading, router, fetchOwnerData]);
+  }, [user, profile, authLoading, fetchOwnerData]);
 
 
   const handleAddBoat = async (e: React.FormEvent) => {
@@ -747,10 +747,10 @@ export default function DashboardPage() {
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Adjust Fare for Route</DialogTitle>
-                    <DialogDescription>
+                    <div className="text-sm text-muted-foreground">
                         <div>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</div>
                         <div className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</div>
-                    </DialogDescription>
+                    </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
                     <div className="text-center">
@@ -781,5 +781,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
