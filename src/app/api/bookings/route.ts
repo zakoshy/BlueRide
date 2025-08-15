@@ -13,11 +13,30 @@ async function createTripFinancials(booking: any) {
     const client = await clientPromise;
     const db = client.db();
 
-    // The booking is new, so we need to get the boat to find the captain
+    // Get the boat to find the captain
     const boat = await db.collection('boats').findOne({ _id: new ObjectId(booking.boatId) });
 
     const fare = booking.finalFare;
     const platformFee = fare * PLATFORM_FEE_PERCENTAGE;
+
+    // --- Investor Payout Calculation ---
+    const investors = await db.collection('investors').find({}).toArray();
+    let totalInvestorShare = 0;
+    const investorPayouts = investors.map(investor => {
+        const investorShare = platformFee * (investor.sharePercentage / 100);
+        totalInvestorShare += investorShare;
+        return {
+            investorId: investor._id,
+            name: investor.name,
+            sharePercentage: investor.sharePercentage,
+            payout: investorShare
+        };
+    });
+
+    // The platform's net share after paying investors
+    const platformShare = platformFee - totalInvestorShare;
+    // --- End Investor Calculation ---
+
     const captainCommission = (fare - platformFee) * CAPTAIN_COMMISSION_PERCENTAGE;
     const ownerShare = fare - platformFee - captainCommission;
 
@@ -25,7 +44,7 @@ async function createTripFinancials(booking: any) {
         bookingId: booking._id,
         boatId: booking.boatId,
         ownerId: booking.ownerId,
-        captainId: boat?.captainId || null, // Get captain from boat
+        captainId: boat?.captainId || null,
         tripCompletedAt: new Date(),
         baseFare: booking.baseFare,
         adjustmentPercent: booking.adjustmentPercent,
@@ -33,6 +52,8 @@ async function createTripFinancials(booking: any) {
         platformFee: platformFee,
         captainCommission: captainCommission,
         boatOwnerShare: ownerShare,
+        platformShare: platformShare, // Store net platform share
+        investorPayouts: investorPayouts, // Store detailed investor payouts
     };
 
     try {

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, DollarSign, BarChart, AlertCircle, Banknote, Ship, UserCheck, BookOpen, UserSquare, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Shield, DollarSign, BarChart, AlertCircle, Banknote, Ship, UserCheck, BookOpen, UserSquare, ChevronLeft, ChevronRight, PlusCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,6 +16,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Combobox } from "@/components/ui/combobox";
 
 
 interface TripFinancials {
@@ -61,9 +65,22 @@ interface Booking {
     finalFare?: number;
 }
 
-interface DailyRevenue {
+interface DailyData {
     date: string;
-    Revenue: number;
+    [key: string]: number | string;
+}
+
+interface Investor {
+    _id: string;
+    name: string;
+    sharePercentage: number;
+    createdAt: string;
+}
+
+interface InvestorFinancials {
+    totalPayout: number;
+    tripCount: number;
+    dailyPayouts: { date: string; Payout: number }[];
 }
 
 
@@ -73,6 +90,7 @@ export default function ErpPage() {
     const { toast } = useToast();
 
     const [loading, setLoading] = useState(true);
+    const [isDataLoading, setIsDataLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
     
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -82,7 +100,7 @@ export default function ErpPage() {
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [totalPlatformFee, setTotalPlatformFee] = useState(0);
     const [totalPayouts, setTotalPayouts] = useState(0);
-    const [dailyRevenueData, setDailyRevenueData] = useState<DailyRevenue[]>([]);
+    const [dailyRevenueData, setDailyRevenueData] = useState<DailyData[]>([]);
 
 
     // Fleet State
@@ -93,10 +111,57 @@ export default function ErpPage() {
 
     // Bookings State
     const [bookings, setBookings] = useState<Booking[]>([]);
+    
+    // Investor State
+    const [investors, setInvestors] = useState<Investor[]>([]);
+    const [isAddInvestorOpen, setAddInvestorOpen] = useState(false);
+    const [newInvestorName, setNewInvestorName] = useState("");
+    const [newInvestorShare, setNewInvestorShare] = useState("");
+    const [selectedInvestor, setSelectedInvestor] = useState<string>("");
+    const [investorFinancials, setInvestorFinancials] = useState<InvestorFinancials | null>(null);
+
+
+    const fetchInvestors = useCallback(async () => {
+        try {
+            const res = await fetch('/api/admin/investors');
+            if (res.ok) {
+                setInvestors(await res.json());
+            } else {
+                toast({ title: "Error", description: "Failed to fetch investors.", variant: "destructive" });
+            }
+        } catch (error) {
+             toast({ title: "Error", description: "An unexpected error occurred while fetching investors.", variant: "destructive" });
+        }
+    }, [toast]);
+
+    const fetchInvestorFinancials = useCallback(async (investorId: string, date: Date) => {
+        if (!investorId) {
+            setInvestorFinancials(null);
+            return;
+        };
+        setIsDataLoading(true);
+        const startDate = startOfMonth(date);
+        const endDate = endOfMonth(date);
+        const query = `?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+        try {
+            const res = await fetch(`/api/erp/investor/${investorId}${query}`);
+            if (res.ok) {
+                setInvestorFinancials(await res.json());
+            } else {
+                 toast({ title: "Error", description: "Failed to fetch investor financial data.", variant: "destructive" });
+                 setInvestorFinancials(null);
+            }
+        } catch (error) {
+             toast({ title: "Error", description: "An unexpected error occurred while fetching investor financials.", variant: "destructive" });
+             setInvestorFinancials(null);
+        } finally {
+            setIsDataLoading(false);
+        }
+    }, [toast]);
 
 
     const fetchData = useCallback(async (date: Date) => {
-        setLoading(true);
+        setIsDataLoading(true);
         const startDate = startOfMonth(date);
         const endDate = endOfMonth(date);
         const query = `?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
@@ -106,7 +171,7 @@ export default function ErpPage() {
                 fetch(`/api/erp/trip-financials${query}`),
                 fetch('/api/erp/fleet'),
                 fetch('/api/erp/crew'),
-                fetch('/api/erp/bookings') // Note: Bookings fetch is not yet filtered by date
+                fetch('/api/erp/bookings') 
             ]);
 
             if (financialsRes.ok) {
@@ -119,7 +184,6 @@ export default function ErpPage() {
                 setTotalPlatformFee(platformFee);
                 setTotalPayouts(payouts);
 
-                // Process data for chart
                 const dailyData: { [key: string]: number } = {};
                 data.forEach((item: TripFinancials) => {
                     const day = format(new Date(item.tripCompletedAt), 'MMM dd');
@@ -133,32 +197,20 @@ export default function ErpPage() {
                  toast({ title: "Error", description: "Failed to fetch financial data.", variant: "destructive" });
             }
 
-            if(fleetRes.ok) {
-                const data = await fleetRes.json();
-                setFleet(data);
-            } else {
-                 toast({ title: "Error", description: "Failed to fetch fleet data.", variant: "destructive" });
-            }
+            if(fleetRes.ok) setFleet(await fleetRes.json());
+            else toast({ title: "Error", description: "Failed to fetch fleet data.", variant: "destructive" });
             
-            if(crewRes.ok) {
-                const data = await crewRes.json();
-                setCrew(data);
-            } else {
-                toast({ title: "Error", description: "Failed to fetch crew data.", variant: "destructive" });
-            }
+            if(crewRes.ok) setCrew(await crewRes.json());
+            else toast({ title: "Error", description: "Failed to fetch crew data.", variant: "destructive" });
 
-             if(bookingsRes.ok) {
-                const data = await bookingsRes.json();
-                setBookings(data);
-            } else {
-                toast({ title: "Error", description: "Failed to fetch bookings data.", variant: "destructive" });
-            }
+            if(bookingsRes.ok) setBookings(await bookingsRes.json());
+            else toast({ title: "Error", description: "Failed to fetch bookings data.", variant: "destructive" });
 
         } catch (error) {
             console.error("Failed to fetch ERP data", error);
             toast({ title: "Error", description: "An unexpected error occurred while fetching dashboard data.", variant: "destructive" });
         } finally {
-            setLoading(false);
+            setIsDataLoading(false);
         }
     }, [toast]);
 
@@ -170,17 +222,73 @@ export default function ErpPage() {
         }
         if (profile?.role === 'admin') {
             setIsAdmin(true);
+            setLoading(false);
             fetchData(currentDate);
+            fetchInvestors();
         } else {
             router.push('/profile');
         }
-    }, [user, profile, authLoading, router, fetchData, currentDate]);
+    }, [user, profile, authLoading, router, currentDate, fetchData, fetchInvestors]);
+
+    useEffect(() => {
+        if(selectedInvestor) {
+            fetchInvestorFinancials(selectedInvestor, currentDate);
+        } else {
+            setInvestorFinancials(null);
+        }
+    }, [selectedInvestor, currentDate, fetchInvestorFinancials]);
+
     
     const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
     const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
 
+    const handleAddInvestor = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const response = await fetch('/api/admin/investors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newInvestorName, sharePercentage: parseFloat(newInvestorShare) })
+            });
 
-     if (authLoading) {
+            if (response.ok) {
+                toast({ title: "Success", description: "Investor added successfully." });
+                setNewInvestorName("");
+                setNewInvestorShare("");
+                setAddInvestorOpen(false);
+                fetchInvestors();
+            } else {
+                const data = await response.json();
+                toast({ title: "Error", description: data.message || "Failed to add investor.", variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+        }
+    }
+
+    const handleDeleteInvestor = async (investorId: string) => {
+         try {
+            const response = await fetch(`/api/admin/investors?id=${investorId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                toast({ title: "Success", description: "Investor deleted successfully." });
+                fetchInvestors();
+                 if (selectedInvestor === investorId) {
+                    setSelectedInvestor("");
+                }
+            } else {
+                const data = await response.json();
+                toast({ title: "Error", description: data.message || "Failed to delete investor.", variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+        }
+    }
+
+
+     if (loading) {
         return (
            <div className="flex min-h-dvh w-full items-center justify-center bg-secondary/50 p-4">
             <div className="w-full max-w-6xl space-y-6">
@@ -234,6 +342,7 @@ export default function ErpPage() {
             default: return 'outline';
         }
     };
+    const investorOptions = investors.map(i => ({ value: i._id, label: `${i.name} (${i.sharePercentage}%)` }));
 
 
     return (
@@ -257,14 +366,15 @@ export default function ErpPage() {
 
             <main className="container mx-auto p-4 sm:p-6 md:p-8">
                 <Tabs defaultValue="financials">
-                    <div className="flex justify-between items-center mb-4">
-                        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
                             <TabsTrigger value="financials">Financials</TabsTrigger>
                             <TabsTrigger value="fleet">Fleet</TabsTrigger>
                             <TabsTrigger value="crew">Crew</TabsTrigger>
                             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+                            <TabsTrigger value="investors">Investors</TabsTrigger>
                         </TabsList>
-                        <div className="flex items-center gap-2 ml-4">
+                        <div className="flex items-center gap-2 ml-auto">
                             <Button variant="outline" size="icon" onClick={handlePrevMonth}><ChevronLeft/></Button>
                             <span className="font-semibold text-lg w-36 text-center">{format(currentDate, 'MMMM yyyy')}</span>
                             <Button variant="outline" size="icon" onClick={handleNextMonth}><ChevronRight/></Button>
@@ -272,9 +382,8 @@ export default function ErpPage() {
                     </div>
 
                     <TabsContent value="financials" className="mt-6">
-                       {loading ? <Skeleton className="h-96 w-full"/> : (
+                       {isDataLoading ? <Skeleton className="h-96 w-full"/> : (
                         <div className="space-y-6">
-                            {/* Financial Overview */}
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><DollarSign/>Financial Overview for {format(currentDate, 'MMMM yyyy')}</CardTitle>
@@ -316,8 +425,7 @@ export default function ErpPage() {
                                     )}
                                 </CardContent>
                             </Card>
-
-                             <Card>
+                            <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><BarChart/>Revenue Analytics</CardTitle>
                                     <CardDescription>Daily revenue collection for {format(currentDate, 'MMMM yyyy')}.</CardDescription>
@@ -339,8 +447,6 @@ export default function ErpPage() {
                                  )}
                                 </CardContent>
                             </Card>
-
-                             {/* Trip Financials Table */}
                              <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><BarChart/>Trip Financials</CardTitle>
@@ -375,7 +481,7 @@ export default function ErpPage() {
                                             ))}
                                         </TableBody>
                                     </Table>
-                                     {financials.length === 0 && !loading && (
+                                     {financials.length === 0 && !isDataLoading && (
                                         <p className="text-center text-muted-foreground py-8">No financial data available for this month.</p>
                                     )}
                                 </CardContent>
@@ -384,7 +490,7 @@ export default function ErpPage() {
                        )}
                     </TabsContent>
                     <TabsContent value="fleet" className="mt-6">
-                         {loading ? <Skeleton className="h-64 w-full"/> : (
+                         {isDataLoading ? <Skeleton className="h-64 w-full"/> : (
                          <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2"><Ship/>Fleet Overview</CardTitle>
@@ -417,7 +523,7 @@ export default function ErpPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
-                                {fleet.length === 0 && !loading && (
+                                {fleet.length === 0 && !isDataLoading && (
                                     <p className="text-center text-muted-foreground py-8">No boats have been registered yet.</p>
                                 )}
                             </CardContent>
@@ -425,7 +531,7 @@ export default function ErpPage() {
                          )}
                     </TabsContent>
                      <TabsContent value="crew" className="mt-6">
-                         {loading ? <Skeleton className="h-64 w-full"/> : (
+                         {isDataLoading ? <Skeleton className="h-64 w-full"/> : (
                          <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2"><UserSquare/>Crew Performance</CardTitle>
@@ -452,7 +558,7 @@ export default function ErpPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
-                                 {crew.length === 0 && !loading && (
+                                 {crew.length === 0 && !isDataLoading && (
                                     <p className="text-center text-muted-foreground py-8">No captains have completed trips yet.</p>
                                 )}
                             </CardContent>
@@ -460,7 +566,7 @@ export default function ErpPage() {
                          )}
                     </TabsContent>
                      <TabsContent value="bookings" className="mt-6">
-                        {loading ? <Skeleton className="h-96 w-full"/> : (
+                        {isDataLoading ? <Skeleton className="h-96 w-full"/> : (
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader>
@@ -512,13 +618,128 @@ export default function ErpPage() {
                                             ))}
                                         </TableBody>
                                     </Table>
-                                     {bookings.length === 0 && !loading && (
+                                     {bookings.length === 0 && !isDataLoading && (
                                         <p className="text-center text-muted-foreground py-8">No bookings have been made yet.</p>
                                     )}
                                 </CardContent>
                             </Card>
                         </div>
                         )}
+                    </TabsContent>
+                    <TabsContent value="investors" className="mt-6">
+                        <div className="grid gap-6 lg:grid-cols-3">
+                            <div className="lg:col-span-1 space-y-6">
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between">
+                                        <div>
+                                            <CardTitle>Manage Investors</CardTitle>
+                                            <CardDescription>Add, view, or remove investors.</CardDescription>
+                                        </div>
+                                        <Dialog open={isAddInvestorOpen} onOpenChange={setAddInvestorOpen}>
+                                            <DialogTrigger asChild>
+                                                <Button size="icon"><PlusCircle className="h-4 w-4" /></Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Add New Investor</DialogTitle>
+                                                </DialogHeader>
+                                                <form onSubmit={handleAddInvestor} className="space-y-4">
+                                                    <div>
+                                                        <Label htmlFor="investor-name">Investor Name</Label>
+                                                        <Input id="investor-name" value={newInvestorName} onChange={(e) => setNewInvestorName(e.target.value)} required />
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="investor-share">Share Percentage (%)</Label>
+                                                        <Input id="investor-share" type="number" value={newInvestorShare} onChange={(e) => setNewInvestorShare(e.target.value)} placeholder="e.g., 50 for 50%" required min="0.01" max="100" step="0.01" />
+                                                        <p className="text-xs text-muted-foreground mt-1">This is their share of the 20% platform fee.</p>
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button type="submit">Add Investor</Button>
+                                                    </DialogFooter>
+                                                </form>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Share</TableHead>
+                                                    <TableHead className="text-right"></TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {investors.map(investor => (
+                                                    <TableRow key={investor._id}>
+                                                        <TableCell>{investor.name}</TableCell>
+                                                        <TableCell>{investor.sharePercentage}%</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="destructive" size="icon" onClick={() => handleDeleteInvestor(investor._id)}><Trash2 className="h-4 w-4" /></Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                        {investors.length === 0 && <p className="text-center text-muted-foreground py-4">No investors added yet.</p>}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            <div className="lg:col-span-2 space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Investor Analytics</CardTitle>
+                                        <CardDescription>Select an investor to view their earnings for the selected month.</CardDescription>
+                                        <div className="pt-2">
+                                            <Combobox
+                                                options={investorOptions}
+                                                selectedValue={selectedInvestor}
+                                                onSelect={setSelectedInvestor}
+                                                placeholder="Select an investor..."
+                                                searchPlaceholder="Search investors..."
+                                                notFoundText="No investors found."
+                                            />
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {isDataLoading && selectedInvestor ? <Skeleton className="h-64 w-full" /> : investorFinancials ? (
+                                            <div className="space-y-4">
+                                                <div className="grid gap-4 md:grid-cols-2">
+                                                    <Card className="p-4">
+                                                        <CardHeader className="p-2 pt-0">
+                                                            <CardTitle className="text-sm font-medium">Total Payout</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="p-2 pb-0">
+                                                            <div className="text-2xl font-bold">Ksh {investorFinancials.totalPayout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                                        </CardContent>
+                                                    </Card>
+                                                    <Card className="p-4">
+                                                        <CardHeader className="p-2 pt-0">
+                                                            <CardTitle className="text-sm font-medium">Trips Contributed To</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="p-2 pb-0">
+                                                            <div className="text-2xl font-bold">{investorFinancials.tripCount}</div>
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                                <ResponsiveContainer width="100%" height={250}>
+                                                    <RechartsBarChart data={investorFinancials.dailyPayouts}>
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis dataKey="date" />
+                                                        <YAxis width={80} tickFormatter={(value) => `Ksh ${Number(value).toLocaleString()}`} />
+                                                        <Tooltip formatter={(value) => [`Ksh ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Payout"]}/>
+                                                        <Legend />
+                                                        <Bar dataKey="Payout" fill="hsl(var(--primary))" />
+                                                    </RechartsBarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        ) : (
+                                            <p className="text-center text-muted-foreground py-8">{selectedInvestor ? 'No financial data for this investor in the selected month.' : 'Please select an investor to see their analytics.'}</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
                     </TabsContent>
                 </Tabs>
             </main>
