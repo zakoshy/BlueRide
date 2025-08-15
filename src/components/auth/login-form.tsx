@@ -88,6 +88,9 @@ export function LoginForm() {
         
         toast({ title: "Login Successful", description: "Welcome back!" });
 
+        // Manually refresh the router state before pushing to a new page.
+        router.refresh();
+
         // Role-based redirection using the freshly fetched profile
         switch (profile.role) {
             case 'admin':
@@ -108,6 +111,7 @@ export function LoginForm() {
         console.error(error);
         // Fallback if profile fetch fails after a successful login
         toast({ title: "Login Successful", description: "Could not retrieve user role, redirecting to profile." });
+        router.refresh();
         router.push('/profile');
     }
   }
