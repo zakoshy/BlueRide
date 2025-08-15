@@ -23,7 +23,6 @@ import type { User as FirebaseUser } from "firebase/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { getCoastalBusinessAdvice, type CoastalAdviceOutput } from "@/ai/flows/coastal-events-flow";
 
 
 interface Boat {
@@ -113,26 +112,23 @@ export default function DashboardPage() {
   const [routeToAdjust, setRouteToAdjust] = useState<Route | null>(null);
   const [singleFareAdjustmentPercent, setSingleFareAdjustmentPercent] = useState([0]);
   
-  // AI State
-  const [advice, setAdvice] = useState<CoastalAdviceOutput | null>(null);
-  const [isAdviceLoading, setIsAdviceLoading] = useState(true);
-
   // ERP State
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [crewPayouts, setCrewPayouts] = useState<CrewPayout[]>([]);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
 
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
     if (!currentUser) return;
     setLoading(true);
-    setIsAdviceLoading(true);
     try {
-        const [boatsRes, bookingsRes, captainsRes, routesRes, adviceRes, finSummaryRes, crewPayoutsRes] = await Promise.all([
+        const [boatsRes, bookingsRes, captainsRes, routesRes, finSummaryRes, crewPayoutsRes] = await Promise.all([
             fetch(`/api/boats?ownerId=${currentUser.uid}`),
             fetch(`/api/bookings/owner/${currentUser.uid}`),
             fetch('/api/captains'),
             fetch('/api/routes/fares'),
-            getCoastalBusinessAdvice(),
             fetch(`/api/erp/owner/${currentUser.uid}/financial-summary`),
             fetch(`/api/erp/owner/${currentUser.uid}/crew-payouts`),
         ]);
@@ -148,8 +144,6 @@ export default function DashboardPage() {
 
         if (routesRes.ok) setRoutes(await routesRes.json());
         else toast({ title: "Error", description: "Could not fetch route fares.", variant: "destructive" });
-        
-        setAdvice(adviceRes);
 
         if (finSummaryRes.ok) setFinancialSummary(await finSummaryRes.json());
         else toast({ title: "Error", description: "Could not fetch financial summary.", variant: "destructive" });
@@ -160,12 +154,8 @@ export default function DashboardPage() {
     } catch (error) {
         console.error("Failed to fetch owner data", error);
         toast({ title: "Error", description: "An unexpected error occurred while fetching your data.", variant: "destructive" });
-        if (error instanceof Error && error.message.includes('AI advisor')) {
-            setAdvice(null);
-        }
     } finally {
         setLoading(false);
-        setIsAdviceLoading(false);
     }
   }, [toast]);
 
@@ -409,6 +399,11 @@ export default function DashboardPage() {
         default: return 'outline';
     }
   };
+
+  const filteredRoutes = routes.filter(route => 
+    route.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    route.to.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -420,45 +415,6 @@ export default function DashboardPage() {
             <p className="text-muted-foreground">Manage your boats, bookings, and route pricing below.</p>
         </div>
 
-        <Card className="mb-8">
-             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Lightbulb /> Business Intelligence</CardTitle>
-                <CardDescription>AI-powered insights to help you navigate the market.</CardDescription>
-             </CardHeader>
-             <CardContent>
-                {isAdviceLoading ? (
-                    <div className="space-y-4">
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
-                    </div>
-                ) : advice ? (
-                    <div className="space-y-4">
-                        <div>
-                            <h4 className="font-semibold">Seasonal Outlook</h4>
-                            <p className="text-sm text-muted-foreground">{advice.seasonalOutlook}</p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold">Upcoming Events & Opportunities</h4>
-                            <ul className="list-disc pl-5 mt-2 space-y-2 text-sm">
-                                {advice.upcomingEvents.map((item, index) => (
-                                    <li key={index}>
-                                        <span className="font-semibold">{item.event} ({item.date}):</span>
-                                        <span className="text-muted-foreground ml-1">{item.advice}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                         <div>
-                            <h4 className="font-semibold">Strategic Recommendation</h4>
-                            <p className="text-sm text-muted-foreground">{advice.strategicRecommendation}</p>
-                        </div>
-                    </div>
-                ) : (
-                     <p className="text-sm text-muted-foreground">Could not load business advice at this time.</p>
-                )}
-             </CardContent>
-        </Card>
-        
         <Tabs defaultValue="fares">
             <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="fares">Route Fares</TabsTrigger>
@@ -469,15 +425,15 @@ export default function DashboardPage() {
 
             <TabsContent value="fares" className="mt-6 space-y-8">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                         <div>
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                         <div className="flex-grow">
                             <CardTitle className="flex items-center gap-2"><DollarSign/>Route Fare Management</CardTitle>
                             <CardDescription>Propose fare changes for routes. All changes require admin approval.</CardDescription>
                          </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex w-full sm:w-auto items-center gap-2">
                             <Dialog open={isAdjustFareDialogOpen} onOpenChange={setAdjustFareDialogOpen}>
                                 <DialogTrigger asChild>
-                                    <Button variant="outline"><TrendingUp className="mr-2 h-4 w-4"/>Adjust All Fares</Button>
+                                    <Button variant="outline" className="w-full sm:w-auto"><TrendingUp className="mr-2 h-4 w-4"/>Adjust All Fares</Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[425px]">
                                     <DialogHeader>
@@ -512,12 +468,20 @@ export default function DashboardPage() {
                                     </CardFooter>
                                 </DialogContent>
                             </Dialog>
-                             <Button onClick={handleUpdateAllFares} disabled={Object.keys(fareChanges).length === 0}>
+                             <Button onClick={handleUpdateAllFares} disabled={Object.keys(fareChanges).length === 0} className="w-full sm:w-auto">
                                 <Send className="mr-2 h-4 w-4"/> Submit All Changes
                              </Button>
                          </div>
                     </CardHeader>
                     <CardContent>
+                        <div className="mb-4">
+                            <Input 
+                                placeholder="Search for a route..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="max-w-sm"
+                            />
+                        </div>
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -529,7 +493,7 @@ export default function DashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {routes.map(route => (
+                                {filteredRoutes.map(route => (
                                     <TableRow key={route._id}>
                                         <TableCell className="font-medium">{route.from}</TableCell>
                                         <TableCell className="font-medium">{route.to}</TableCell>
@@ -564,8 +528,8 @@ export default function DashboardPage() {
                                 ))}
                             </TableBody>
                         </Table>
-                         {routes.length === 0 && !loading && (
-                            <p className="text-center text-muted-foreground py-8">No routes found to manage.</p>
+                         {filteredRoutes.length === 0 && !loading && (
+                            <p className="text-center text-muted-foreground py-8">No routes found matching your search.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -817,3 +781,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
