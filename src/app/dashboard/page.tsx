@@ -130,30 +130,30 @@ export default function DashboardPage() {
   }, [toast]);
 
  useEffect(() => {
-    // This effect handles authentication checks and data fetching.
-    // It waits until the initial auth state loading is complete.
+    // Wait for the auth state to be fully resolved
     if (authLoading) {
-        return; // Wait for Firebase to initialize
+        setLoading(true);
+        return;
     }
 
-    // If auth is done and there's no user, redirect to login.
+    // If auth is resolved and there's no user, redirect to login
     if (!user) {
         router.push('/login');
         return;
     }
 
-    // If we have a user but are waiting for the profile from our DB, do nothing yet.
-    // The component will show a loading skeleton.
+    // If there is a user, but we're still waiting for the DB profile
     if (!profile) {
+        setLoading(true);
         return;
     }
 
-    // Once we have a user and their profile, check their role.
+    // Now we have user and profile, we can make decisions
     if (profile.role === 'boat_owner' || profile.role === 'admin') {
         setIsOwner(true);
         fetchOwnerData(user);
     } else {
-        // If the user is not an owner or admin, they shouldn't be here.
+        // If the user does not have the correct role, redirect away
         router.push('/profile');
     }
 }, [user, profile, authLoading, router, fetchOwnerData]);
@@ -638,8 +638,8 @@ export default function DashboardPage() {
                 <DialogHeader>
                     <DialogTitle>Adjust Fare for Route</DialogTitle>
                     <DialogDescription>
-                        <p className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</p>
-                        <p>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</p>
+                        <div className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</div>
+                        <div>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</div>
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
