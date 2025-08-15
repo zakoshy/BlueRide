@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 import { Combobox } from "@/components/ui/combobox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 interface ManagedUser {
@@ -43,16 +44,29 @@ interface Boat {
     ownerId: string;
 }
 
+interface FareProposal {
+    _id: string;
+    routeId: string;
+    ownerId: string;
+    proposedFare: number;
+    status: 'pending' | 'approved' | 'rejected';
+    createdAt: string;
+    owner: { name: string };
+    route: { from: string; to: string; currentFare: number };
+}
+
 export default function AdminPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
-  const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [selectedOwner, setSelectedOwner] = useState<ManagedUser | null>(null);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
+  const [fareProposals, setFareProposals] = useState<FareProposal[]>([]);
+  
+  const [selectedOwner, setSelectedOwner] = useState<ManagedUser | null>(null);
   const [isManageBoatsDialogOpen, setManageBoatsDialogOpen] = useState(false);
   const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
   
@@ -61,25 +75,28 @@ export default function AdminPage() {
   const [roleToPromote, setRoleToPromote] = useState<'boat_owner' | 'captain'>('boat_owner');
   const [isPromoteCaptainDialogOpen, setPromoteCaptainDialogOpen] = useState(false);
 
-
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
   const [newBoatDescription, setNewBoatDescription] = useState('');
   const [newBoatLicense, setNewBoatLicense] = useState('');
 
 
-  const fetchUsers = useCallback(async () => {
+  const fetchAdminData = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/users');
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
-      } else {
-        toast({ title: "Error", description: "Failed to fetch users.", variant: "destructive" });
-      }
+        const [usersRes, proposalsRes] = await Promise.all([
+            fetch('/api/admin/users'),
+            fetch('/api/fare-proposals')
+        ]);
+
+      if (usersRes.ok) setUsers(await usersRes.json());
+      else toast({ title: "Error", description: "Failed to fetch users.", variant: "destructive" });
+
+      if (proposalsRes.ok) setFareProposals(await proposalsRes.json());
+      else toast({ title: "Error", description: "Failed to fetch fare proposals.", variant: "destructive" });
+
     } catch (error) {
-      console.error("Failed to fetch users", error);
-      toast({ title: "Error", description: "An unexpected error occurred while fetching users.", variant: "destructive" });
+      console.error("Failed to fetch admin data", error);
+      toast({ title: "Error", description: "An unexpected error occurred while fetching admin data.", variant: "destructive" });
     }
   }, [toast]);
 
@@ -92,12 +109,12 @@ export default function AdminPage() {
     }
     if (profile?.role === 'admin') {
       setIsAdmin(true);
-      fetchUsers();
+      fetchAdminData();
     } else {
       router.push('/profile');
     }
     setLoading(false);
-  }, [user, profile, authLoading, router, fetchUsers]);
+  }, [user, profile, authLoading, router, fetchAdminData]);
   
   const handleLogout = async () => {
     await signOut(auth);
@@ -183,7 +200,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         toast({ title: "Success", description: "User role updated successfully." });
-        fetchUsers(); // Refresh user list
+        fetchAdminData(); // Refresh user list
         return true;
       } else {
         const errorData = await response.json();
@@ -236,6 +253,26 @@ export default function AdminPage() {
     }
   }
 
+  const handleFareProposal = async (proposalId: string, status: 'approved' | 'rejected') => {
+    try {
+        const response = await fetch('/api/fare-proposals', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ proposalId, status }),
+        });
+
+        if (response.ok) {
+            toast({ title: "Success", description: `Fare proposal has been ${status}.` });
+            fetchAdminData(); // Refresh proposals list
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Action Failed", description: errorData.message || "Could not process fare proposal.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Error processing fare proposal:", error);
+        toast({ title: "Error", description: "An unexpected error occurred while processing the proposal.", variant: "destructive" });
+    }
+  }
 
   if (loading || authLoading) {
     return (
@@ -282,6 +319,7 @@ export default function AdminPage() {
   
   const riderUsers = users.filter(u => u.role === 'rider');
   const riderOptions = riderUsers.map(u => ({ value: u.uid, label: `${u.name} (${u.email})`}));
+  const pendingProposals = fareProposals.filter(p => p.status === 'pending');
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -334,128 +372,181 @@ export default function AdminPage() {
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Admin'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage users, roles, boats, and view platform analytics.</p>
+        <p className="text-muted-foreground mb-8">Manage users, roles, boats, and review fare proposals.</p>
         
-        <div className="mb-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <BarChart3 />
-                        ERP &amp; Analytics
-                    </CardTitle>
-                    <CardDescription>
-                        Access financial data, fleet health, and performance metrics.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button asChild>
-                        <Link href="/erp">Go to ERP Dashboard</Link>
-                    </Button>
-                </CardContent>
-            </Card>
-        </div>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
-              <CardDescription>View all users and modify their roles. Boat owners can have their boats managed from here.</CardDescription>
-            </div>
-             <div className="flex gap-2">
-                <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => { setUserToPromote(''); setRoleToPromote('boat_owner'); setPromoteUserDialogOpen(true); }}><UserPlus className="mr-2 h-4 w-4"/>Promote to Owner</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle>Promote Rider to Boat Owner</DialogTitle>
-                            <DialogDescription>
-                                Select a 'Rider' to promote them to a 'Boat Owner'.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handlePromoteUser}>
-                            <div className="grid gap-4 py-4">
-                               <Label htmlFor="user-to-promote">Select Rider</Label>
-                               <Combobox
-                                    options={riderOptions}
-                                    selectedValue={userToPromote}
-                                    onSelect={setUserToPromote}
-                                    placeholder="Select a user to promote..."
-                                    searchPlaceholder="Search riders..."
-                                    notFoundText="No riders found."
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button type="submit" disabled={!userToPromote}>Promote to Boat Owner</Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-                 <Dialog open={isPromoteCaptainDialogOpen} onOpenChange={setPromoteCaptainDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="secondary" onClick={() => { setUserToPromote(''); setRoleToPromote('captain'); setPromoteCaptainDialogOpen(true); }}><Anchor className="mr-2 h-4 w-4"/>Promote to Captain</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle>Promote Rider to Captain</DialogTitle>
-                            <DialogDescription>
-                                Select a 'Rider' to promote them to a 'Captain'.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handlePromoteUser}>
-                            <div className="grid gap-4 py-4">
-                               <Label htmlFor="user-to-promote-captain">Select Rider</Label>
-                               <Combobox
-                                    options={riderOptions}
-                                    selectedValue={userToPromote}
-                                    onSelect={setUserToPromote}
-                                    placeholder="Select a user to promote..."
-                                    searchPlaceholder="Search riders..."
-                                    notFoundText="No riders found."
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button type="submit" disabled={!userToPromote}>Promote to Captain</Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                 </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u._id}>
-                    <TableCell className="font-medium">{u.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={u.role === 'admin' ? 'destructive' : u.role === 'boat_owner' ? 'default' : u.role === 'captain' ? 'secondary' : 'outline'}>{u.role}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">
-                        {u.role === 'boat_owner' && (
-                            <Button variant="outline" size="sm" onClick={() => handleManageBoatsClick(u)}>
-                                <Ship className="mr-2 h-4 w-4"/>
-                                Manage Boats
-                            </Button>
+        <Tabs defaultValue="users">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="users">User Management</TabsTrigger>
+                <TabsTrigger value="fares">Fare Proposals {pendingProposals.length > 0 && <Badge className="ml-2">{pendingProposals.length}</Badge>}</TabsTrigger>
+                <TabsTrigger value="erp">ERP &amp; Analytics</TabsTrigger>
+            </TabsList>
+            <TabsContent value="users" className="mt-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
+                      <CardDescription>View all users and modify their roles. Boat owners can have their boats managed from here.</CardDescription>
+                    </div>
+                     <div className="flex gap-2">
+                        <Dialog open={isPromoteUserDialogOpen} onOpenChange={setPromoteUserDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button onClick={() => { setUserToPromote(''); setRoleToPromote('boat_owner'); setPromoteUserDialogOpen(true); }}><UserPlus className="mr-2 h-4 w-4"/>Promote to Owner</Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                    <DialogTitle>Promote Rider to Boat Owner</DialogTitle>
+                                    <DialogDescription>
+                                        Select a 'Rider' to promote them to a 'Boat Owner'.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handlePromoteUser}>
+                                    <div className="grid gap-4 py-4">
+                                       <Label htmlFor="user-to-promote">Select Rider</Label>
+                                       <Combobox
+                                            options={riderOptions}
+                                            selectedValue={userToPromote}
+                                            onSelect={setUserToPromote}
+                                            placeholder="Select a user to promote..."
+                                            searchPlaceholder="Search riders..."
+                                            notFoundText="No riders found."
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="submit" disabled={!userToPromote}>Promote to Boat Owner</Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                         <Dialog open={isPromoteCaptainDialogOpen} onOpenChange={setPromoteCaptainDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="secondary" onClick={() => { setUserToPromote(''); setRoleToPromote('captain'); setPromoteCaptainDialogOpen(true); }}><Anchor className="mr-2 h-4 w-4"/>Promote to Captain</Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                    <DialogTitle>Promote Rider to Captain</DialogTitle>
+                                    <DialogDescription>
+                                        Select a 'Rider' to promote them to a 'Captain'.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handlePromoteUser}>
+                                    <div className="grid gap-4 py-4">
+                                       <Label htmlFor="user-to-promote-captain">Select Rider</Label>
+                                       <Combobox
+                                            options={riderOptions}
+                                            selectedValue={userToPromote}
+                                            onSelect={setUserToPromote}
+                                            placeholder="Select a user to promote..."
+                                            searchPlaceholder="Search riders..."
+                                            notFoundText="No riders found."
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="submit" disabled={!userToPromote}>Promote to Captain</Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                         </Dialog>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Joined</TableHead>
+                          <TableHead className="text-right"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((u) => (
+                          <TableRow key={u._id}>
+                            <TableCell className="font-medium">{u.name}</TableCell>
+                            <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={u.role === 'admin' ? 'destructive' : u.role === 'boat_owner' ? 'default' : u.role === 'captain' ? 'secondary' : 'outline'}>{u.role}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell className="text-right">
+                                {u.role === 'boat_owner' && (
+                                    <Button variant="outline" size="sm" onClick={() => handleManageBoatsClick(u)}>
+                                        <Ship className="mr-2 h-4 w-4"/>
+                                        Manage Boats
+                                    </Button>
+                                )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+            </TabsContent>
+             <TabsContent value="fares" className="mt-6">
+                 <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2"><DollarSign/>Pending Fare Proposals</CardTitle>
+                      <CardDescription>Review and approve or reject fare changes proposed by boat owners.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         {pendingProposals.length > 0 ? (
+                           <Table>
+                                <TableHeader>
+                                <TableRow>
+                                    <TableHead>Owner</TableHead>
+                                    <TableHead>Route</TableHead>
+                                    <TableHead>Current Fare</TableHead>
+                                    <TableHead>Proposed Fare</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {pendingProposals.map((p) => (
+                                    <TableRow key={p._id}>
+                                        <TableCell>{p.owner.name}</TableCell>
+                                        <TableCell className="text-xs">{p.route.from}<br/>to {p.route.to}</TableCell>
+                                        <TableCell>Ksh {p.route.currentFare.toLocaleString()}</TableCell>
+                                        <TableCell className="font-bold">Ksh {p.proposedFare.toLocaleString()}</TableCell>
+                                        <TableCell>{new Date(p.createdAt).toLocaleDateString()}</TableCell>
+                                        <TableCell className="text-right space-x-2">
+                                            <Button size="sm" variant="destructive" onClick={() => handleFareProposal(p._id, 'rejected')}>
+                                                <XCircle className="mr-2 h-4 w-4"/> Reject
+                                            </Button>
+                                            <Button size="sm" variant="default" onClick={() => handleFareProposal(p._id, 'approved')}>
+                                                <CheckCircle className="mr-2 h-4 w-4"/> Approve
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                           <p className="text-center text-muted-foreground py-8">There are no pending fare proposals.</p>
                         )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                    </CardContent>
+                 </Card>
+            </TabsContent>
+            <TabsContent value="erp" className="mt-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <BarChart3 />
+                            ERP &amp; Analytics
+                        </CardTitle>
+                        <CardDescription>
+                            Access financial data, fleet health, and performance metrics.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button asChild>
+                            <Link href="/erp">Go to ERP Dashboard</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
       </main>
       
       {/* Manage Boats Dialog */}
@@ -556,6 +647,5 @@ export default function AdminPage() {
     </div>
   );
 }
-
 
     

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,7 +21,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Combobox } from "@/components/ui/combobox";
 import type { User as FirebaseUser } from "firebase/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
@@ -51,7 +50,6 @@ interface Booking {
     boat?: { name: string };
     baseFare: number;
     finalFare?: number;
-    adjustmentPercent?: number;
 }
 
 interface Captain {
@@ -60,7 +58,12 @@ interface Captain {
     email: string;
 }
 
-const MAX_ADJUSTMENT = 15; // 15%
+interface Route {
+    _id: string;
+    from: string;
+    to: string;
+    fare_per_person_kes: number;
+}
 
 export default function DashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -73,9 +76,9 @@ export default function DashboardPage() {
   const [boats, setBoats] = useState<Boat[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [captains, setCaptains] = useState<Captain[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [fareChanges, setFareChanges] = useState<Record<string, number | string>>({});
   
-  const [currentAdjustments, setCurrentAdjustments] = useState<Record<string, number>>({});
-
   const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
@@ -87,52 +90,30 @@ export default function DashboardPage() {
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
     if (!currentUser) return;
     
-    // Fetch boats
+    // Fetch boats, bookings, captains, and routes in parallel
     try {
-        const boatsResponse = await fetch(`/api/boats?ownerId=${currentUser.uid}`);
-        if (boatsResponse.ok) {
-            const boatsData = await boatsResponse.json();
-            setBoats(boatsData);
-        } else {
-            toast({ title: "Error", description: "Failed to fetch your boats.", variant: "destructive" });
-        }
-    } catch (error) {
-        console.error("Failed to fetch boats", error);
-        toast({ title: "Error", description: "An unexpected error occurred while fetching your boats.", variant: "destructive" });
-    }
+        const [boatsRes, bookingsRes, captainsRes, routesRes] = await Promise.all([
+            fetch(`/api/boats?ownerId=${currentUser.uid}`),
+            fetch(`/api/bookings/owner/${currentUser.uid}`),
+            fetch('/api/captains'),
+            fetch('/api/routes/fares')
+        ]);
 
-    // Fetch bookings
-     try {
-        const bookingsResponse = await fetch(`/api/bookings/owner/${currentUser.uid}`);
-        if (bookingsResponse.ok) {
-            const bookingsData = await bookingsResponse.json();
-            setBookings(bookingsData);
-            // Initialize adjustments state
-            const initialAdjustments: Record<string, number> = {};
-            bookingsData.forEach((b: Booking) => {
-                initialAdjustments[b._id] = b.adjustmentPercent || 0;
-            });
-            setCurrentAdjustments(initialAdjustments);
-        } else {
-            toast({ title: "Error", description: "Failed to fetch your bookings.", variant: "destructive" });
-        }
-    } catch (error) {
-        console.error("Failed to fetch bookings", error);
-        toast({ title: "Error", description: "An unexpected error occurred while fetching your bookings.", variant: "destructive" });
-    }
+        if (boatsRes.ok) setBoats(await boatsRes.json());
+        else toast({ title: "Error", description: "Failed to fetch your boats.", variant: "destructive" });
 
-    // Fetch captains
-    try {
-        const captainsResponse = await fetch('/api/captains');
-        if(captainsResponse.ok) {
-            const captainsData = await captainsResponse.json();
-            setCaptains(captainsData);
-        } else {
-            toast({ title: "Error", description: "Could not fetch list of captains.", variant: "destructive" });
-        }
-    } catch(error) {
-         console.error("Failed to fetch captains", error);
-         toast({ title: "Error", description: "An unexpected error occurred while fetching captains.", variant: "destructive" });
+        if (bookingsRes.ok) setBookings(await bookingsRes.json());
+        else toast({ title: "Error", description: "Failed to fetch your bookings.", variant: "destructive" });
+
+        if (captainsRes.ok) setCaptains(await captainsRes.json());
+        else toast({ title: "Error", description: "Could not fetch list of captains.", variant: "destructive" });
+
+        if (routesRes.ok) setRoutes(await routesRes.json());
+        else toast({ title: "Error", description: "Could not fetch route fares.", variant: "destructive" });
+        
+    } catch (error) {
+        console.error("Failed to fetch owner data", error);
+        toast({ title: "Error", description: "An unexpected error occurred while fetching your data.", variant: "destructive" });
     }
 
   }, [toast]);
@@ -210,29 +191,69 @@ export default function DashboardPage() {
     }
   }
   
-  const handleFareAdjustment = async (bookingId: string, baseFare: number) => {
-    const adjustmentPercent = currentAdjustments[bookingId] || 0;
-    const finalFare = baseFare * (1 + adjustmentPercent / 100);
+   const handleFareInputChange = (routeId: string, value: string) => {
+        setFareChanges(prev => ({ ...prev, [routeId]: value }));
+    };
 
-    try {
-         const response = await fetch('/api/bookings/adjust', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bookingId, finalFare, adjustmentPercent }),
-        });
+    const submitFareProposals = async (proposals: { routeId: string; proposedFare: number }[]) => {
+        if (!user || proposals.length === 0) return;
 
-        if(response.ok) {
-             toast({ title: "Success", description: `Fare has been adjusted successfully.` });
-             if (user) fetchOwnerData(user); // Refresh to show new final fare
-        } else {
-             const errorData = await response.json();
-             toast({ title: "Adjustment Failed", description: errorData.message || "Could not adjust fare.", variant: "destructive" });
+        try {
+            const response = await fetch('/api/fare-proposals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ownerId: user.uid, proposals }),
+            });
+
+            if (response.ok) {
+                toast({
+                    title: "Proposals Submitted",
+                    description: "Your fare change proposals have been sent to an admin for review.",
+                });
+                // Clear the submitted changes from the local state
+                const submittedIds = proposals.map(p => p.routeId);
+                setFareChanges(prev => {
+                    const next = { ...prev };
+                    submittedIds.forEach(id => delete next[id]);
+                    return next;
+                });
+            } else {
+                const errorData = await response.json();
+                toast({ title: "Submission Failed", description: errorData.message || "Could not submit fare proposals.", variant: "destructive" });
+            }
+        } catch (error) {
+            console.error("Error submitting fare proposals:", error);
+            toast({ title: "Error", description: "An unexpected error occurred while submitting proposals.", variant: "destructive" });
         }
-    } catch (error) {
-        console.error("Failed to adjust fare", error);
-        toast({ title: "Error", description: "An unexpected error occurred while adjusting the fare.", variant: "destructive" });
-    }
-  }
+    };
+
+    const handleUpdateSingleFare = (route: Route) => {
+        const proposedFare = Number(fareChanges[route._id]);
+        if (isNaN(proposedFare) || proposedFare <= 0 || proposedFare === route.fare_per_person_kes) {
+            toast({ title: "Invalid Fare", description: "Please enter a valid, new fare.", variant: "destructive" });
+            return;
+        }
+        submitFareProposals([{ routeId: route._id, proposedFare }]);
+    };
+
+    const handleUpdateAllFares = () => {
+        const proposals = Object.entries(fareChanges)
+            .map(([routeId, fare]) => {
+                const route = routes.find(r => r._id === routeId);
+                const proposedFare = Number(fare);
+                if (route && !isNaN(proposedFare) && proposedFare > 0 && proposedFare !== route.fare_per_person_kes) {
+                    return { routeId, proposedFare };
+                }
+                return null;
+            })
+            .filter((p): p is { routeId: string; proposedFare: number } => p !== null);
+
+        if (proposals.length > 0) {
+            submitFareProposals(proposals);
+        } else {
+            toast({ title: "No Changes", description: "No new, valid fare changes to submit." });
+        }
+    };
 
 
   if (loading || authLoading) {
@@ -288,84 +309,89 @@ export default function DashboardPage() {
     }
   };
   
-  const completedBookings = bookings.filter(b => b.status === 'completed');
-  const pastBookings = bookings.filter(b => b.status === 'rejected');
-  const getFinalFare = (baseFare: number, adjustment: number) => baseFare * (1 + adjustment/100);
-
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
        <Header />
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
         <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Owner'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage your boats and bookings. All bookings are auto-completed upon payment.</p>
+        <p className="text-muted-foreground mb-8">Manage your boats, bookings, and route pricing below.</p>
         
-        <Tabs defaultValue="bookings">
-            <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="bookings">Bookings</TabsTrigger>
+        <Tabs defaultValue="fares">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="fares">Route Fares</TabsTrigger>
+                <TabsTrigger value="bookings">Booking History</TabsTrigger>
                 <TabsTrigger value="boats">My Fleet</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="bookings" className="mt-6 space-y-8">
+            <TabsContent value="fares" className="mt-6 space-y-8">
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookOpen/>Completed Trips & Fare Adjustment</CardTitle>
-                        <CardDescription>These trips are completed. You can adjust the final fare for a short period after booking.</CardDescription>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                         <div>
+                            <CardTitle className="flex items-center gap-2"><DollarSign/>Route Fare Management</CardTitle>
+                            <CardDescription>Propose fare changes for routes. All changes require admin approval.</CardDescription>
+                         </div>
+                         <Button onClick={handleUpdateAllFares} disabled={Object.keys(fareChanges).length === 0}>
+                            <Send className="mr-2 h-4 w-4"/> Submit All Changes
+                         </Button>
                     </CardHeader>
                     <CardContent>
-                         {completedBookings.length > 0 ? (
-                           <div className="space-y-4">
-                                {completedBookings.map(booking => (
-                                    <Card key={booking._id} className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                        <div className="col-span-1">
-                                             <div className="font-semibold">{booking.boat?.name || 'N/A'}</div>
-                                             <p className="text-sm text-muted-foreground">Rider: {booking.rider?.name || 'N/A'}</p>
-                                             <p className="text-xs">{booking.pickup} to {booking.destination}</p>
-                                             <p className="text-xs text-muted-foreground">{booking.bookingType === 'seat' ? `${booking.seats} seat(s)` : 'Whole boat'}</p>
-                                        </div>
-                                         <div className="col-span-1 space-y-2">
-                                            <Label>Fare Adjustment ({currentAdjustments[booking._id] || 0}%)</Label>
-                                            <div className="flex items-center gap-2">
-                                                <Minus className="h-4 w-4 text-muted-foreground"/>
-                                                <Slider
-                                                    min={-MAX_ADJUSTMENT}
-                                                    max={MAX_ADJUSTMENT}
-                                                    step={1}
-                                                    value={[currentAdjustments[booking._id] || 0]}
-                                                    onValueChange={(value) => setCurrentAdjustments(prev => ({ ...prev, [booking._id]: value[0] }))}
-                                                />
-                                                <Plus className="h-4 w-4 text-muted-foreground"/>
-                                            </div>
-                                            <div className="text-center">
-                                                 {typeof booking.baseFare === 'number' && (
-                                                    <>
-                                                        <p className="text-xs text-muted-foreground">Base: Ksh {booking.baseFare.toLocaleString()}</p>
-                                                        <p className="font-semibold">Final: Ksh {getFinalFare(booking.baseFare, currentAdjustments[booking._id] || 0).toLocaleString()}</p>
-                                                    </>
-                                                 )}
-                                            </div>
-                                        </div>
-                                        <div className="col-span-1 flex flex-col items-end gap-2">
-                                            <Button size="sm" className="w-full sm:w-auto" onClick={() => handleFareAdjustment(booking._id, booking.baseFare)}>Update Fare</Button>
-                                        </div>
-                                    </Card>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>From</TableHead>
+                                    <TableHead>To</TableHead>
+                                    <TableHead>Current Fare (Ksh)</TableHead>
+                                    <TableHead>New Fare (Ksh)</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {routes.map(route => (
+                                    <TableRow key={route._id}>
+                                        <TableCell className="font-medium">{route.from}</TableCell>
+                                        <TableCell className="font-medium">{route.to}</TableCell>
+                                        <TableCell>{route.fare_per_person_kes.toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            <Input 
+                                                type="number" 
+                                                className="max-w-[150px]"
+                                                placeholder={route.fare_per_person_kes.toString()}
+                                                value={fareChanges[route._id] ?? ''}
+                                                onChange={(e) => handleFareInputChange(route._id, e.target.value)}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                onClick={() => handleUpdateSingleFare(route)}
+                                                disabled={!fareChanges[route._id] || Number(fareChanges[route._id]) === route.fare_per_person_kes}
+                                            >
+                                               <Send className="mr-2 h-4 w-4"/> Propose Change
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
                                 ))}
-                           </div>
-                        ) : (
-                            <p className="text-center text-muted-foreground py-8">You have no completed trips yet.</p>
+                            </TableBody>
+                        </Table>
+                         {routes.length === 0 && !loading && (
+                            <p className="text-center text-muted-foreground py-8">No routes found to manage.</p>
                         )}
                     </CardContent>
                 </Card>
+            </TabsContent>
 
+            <TabsContent value="bookings" className="mt-6 space-y-8">
                  <Card>
                     <CardHeader>
                     <CardTitle className="flex items-center gap-2"><BookOpen/>Booking History</CardTitle>
                     <CardDescription>
-                       This is a log of all your past bookings, including rejected ones.
+                       This is a log of all your past bookings.
                     </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {pastBookings.length > 0 ? (
+                        {bookings.length > 0 ? (
                            <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -378,12 +404,12 @@ export default function DashboardPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {pastBookings.map(booking => (
+                                    {bookings.map(booking => (
                                         <TableRow key={booking._id}>
                                             <TableCell>{booking.rider?.name || 'N/A'}</TableCell>
                                             <TableCell>{booking.boat?.name || 'N/A'}</TableCell>
                                             <TableCell className="text-xs">{booking.pickup}<br/>to {booking.destination}</TableCell>
-                                            <TableCell className="font-semibold">Ksh {booking.finalFare?.toLocaleString() || 'N/A'}</TableCell>
+                                            <TableCell className="font-semibold">Ksh {booking.finalFare?.toLocaleString() || booking.baseFare.toLocaleString()}</TableCell>
                                             <TableCell>{new Date(booking.createdAt).toLocaleDateString()}</TableCell>
                                             <TableCell><Badge variant={statusVariant(booking.status)}>{booking.status}</Badge></TableCell>
                                         </TableRow>
@@ -391,7 +417,7 @@ export default function DashboardPage() {
                                 </TableBody>
                            </Table>
                         ) : (
-                            <p className="text-center text-muted-foreground py-8">You have no other booking history yet.</p>
+                            <p className="text-center text-muted-foreground py-8">You have no booking history yet.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -489,3 +515,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
