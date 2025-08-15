@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 const CoastalAdviceInputSchema = z.object({});
 
 // Output Schema
-export const CoastalAdviceOutputSchema = z.object({
+const CoastalAdviceOutputSchema = z.object({
   seasonalOutlook: z.string().describe("A brief paragraph (2-3 sentences) on the current seasonal outlook for tourism and travel in coastal Kenya."),
   upcomingEvents: z.array(z.object({
     event: z.string().describe("The name of the event or holiday."),
