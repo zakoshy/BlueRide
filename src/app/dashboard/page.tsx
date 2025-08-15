@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,6 +22,7 @@ import { Combobox } from "@/components/ui/combobox";
 import type { User as FirebaseUser } from "firebase/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 
 
 interface Boat {
@@ -85,6 +86,10 @@ export default function DashboardPage() {
   const [newBoatDescription, setNewBoatDescription] = useState('');
   const [newBoatLicense, setNewBoatLicense] = useState('');
   const [newBoatType, setNewBoatType] = useState<'standard' | 'luxury' | 'speed'>('standard');
+  
+  const [isAdjustFareDialogOpen, setAdjustFareDialogOpen] = useState(false);
+  const [fareAdjustmentPercent, setFareAdjustmentPercent] = useState([0]);
+
 
 
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
@@ -254,6 +259,28 @@ export default function DashboardPage() {
             toast({ title: "No Changes", description: "No new, valid fare changes to submit." });
         }
     };
+    
+     const handleApplyPercentageChange = () => {
+        const percent = fareAdjustmentPercent[0];
+        const multiplier = 1 + (percent / 100);
+        const newFareChanges: Record<string, number> = {};
+        
+        routes.forEach(route => {
+            const currentFare = route.fare_per_person_kes;
+            const newFare = Math.round(currentFare * multiplier);
+            // Only stage the change if it's different from the current fare
+            if (newFare !== currentFare) {
+                 newFareChanges[route._id] = newFare;
+            }
+        });
+
+        setFareChanges(newFareChanges);
+        toast({
+            title: "Fares Adjusted",
+            description: `All fares have been adjusted by ${percent}%. Review and click 'Submit All Changes' to propose them.`
+        });
+        setAdjustFareDialogOpen(false);
+    }
 
 
   if (loading || authLoading) {
@@ -331,9 +358,48 @@ export default function DashboardPage() {
                             <CardTitle className="flex items-center gap-2"><DollarSign/>Route Fare Management</CardTitle>
                             <CardDescription>Propose fare changes for routes. All changes require admin approval.</CardDescription>
                          </div>
-                         <Button onClick={handleUpdateAllFares} disabled={Object.keys(fareChanges).length === 0}>
-                            <Send className="mr-2 h-4 w-4"/> Submit All Changes
-                         </Button>
+                          <div className="flex items-center gap-2">
+                            <Dialog open={isAdjustFareDialogOpen} onOpenChange={setAdjustFareDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline"><TrendingUp className="mr-2 h-4 w-4"/>Adjust All Fares</Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                    <DialogTitle>Adjust All Route Fares</DialogTitle>
+                                    <DialogDescription>
+                                        Use the slider to apply a percentage-based adjustment to all your routes.
+                                    </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="py-4 space-y-4">
+                                        <div className="text-center">
+                                            <span className="text-4xl font-bold">
+                                                {fareAdjustmentPercent[0] > 0 && '+'}
+                                                {fareAdjustmentPercent[0]}%
+                                            </span>
+                                        </div>
+                                        <Slider
+                                            defaultValue={[0]}
+                                            value={fareAdjustmentPercent}
+                                            onValueChange={setFareAdjustmentPercent}
+                                            max={15}
+                                            min={-15}
+                                            step={1}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>-15%</span>
+                                            <span>0%</span>
+                                            <span>+15%</span>
+                                        </div>
+                                    </div>
+                                    <CardFooter>
+                                        <Button className="w-full" onClick={handleApplyPercentageChange}>Apply Adjustment</Button>
+                                    </CardFooter>
+                                </DialogContent>
+                            </Dialog>
+                             <Button onClick={handleUpdateAllFares} disabled={Object.keys(fareChanges).length === 0}>
+                                <Send className="mr-2 h-4 w-4"/> Submit All Changes
+                             </Button>
+                         </div>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -515,5 +581,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
