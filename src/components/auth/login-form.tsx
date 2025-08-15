@@ -88,22 +88,22 @@ export function LoginForm() {
         
         toast({ title: "Login Successful", description: "Welcome back!" });
 
-        // Role-based redirection using the freshly fetched profile
+        // A more robust redirection using window.location to force a full page reload,
+        // which ensures all states are correctly loaded on the target page.
+        let targetUrl = '/profile';
         switch (profile.role) {
             case 'admin':
-                router.push('/admin');
+                targetUrl = '/admin';
                 break;
             case 'boat_owner':
-                router.push('/dashboard');
+                targetUrl = '/dashboard';
                 break;
             case 'captain':
-                router.push('/captain');
-                break;
-            case 'rider':
-            default:
-                router.push('/profile');
+                targetUrl = '/captain';
                 break;
         }
+        window.location.href = targetUrl;
+
     } catch (error) {
         console.error(error);
         // Fallback if profile fetch fails after a successful login

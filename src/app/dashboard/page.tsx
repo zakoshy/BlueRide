@@ -99,7 +99,7 @@ export default function DashboardPage() {
 
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
     if (!currentUser) return;
-    
+    setLoading(true);
     // Fetch boats, bookings, captains, and routes in parallel
     try {
         const [boatsRes, bookingsRes, captainsRes, routesRes] = await Promise.all([
@@ -124,39 +124,39 @@ export default function DashboardPage() {
     } catch (error) {
         console.error("Failed to fetch owner data", error);
         toast({ title: "Error", description: "An unexpected error occurred while fetching your data.", variant: "destructive" });
+    } finally {
+        setLoading(false);
     }
-
   }, [toast]);
 
-  useEffect(() => {
-    // Wait for the auth state to be fully resolved
+ useEffect(() => {
+    // This effect handles authentication checks and data fetching.
+    // It waits until the initial auth state loading is complete.
     if (authLoading) {
-      setLoading(true);
-      return;
-    }
-    
-    // If auth is resolved and there's no user, redirect to login
-    if (!user) {
-      router.push('/login');
-      return;
+        return; // Wait for Firebase to initialize
     }
 
-    // If we have a user but are waiting for the profile, keep loading
-    if (!profile) {
-        setLoading(true);
+    // If auth is done and there's no user, redirect to login.
+    if (!user) {
+        router.push('/login');
         return;
     }
 
-    // Now we have user and profile, check the role
-    if (profile.role === 'boat_owner' || profile.role === 'admin') {
-      setIsOwner(true);
-      fetchOwnerData(user).finally(() => setLoading(false));
-    } else {
-      // If role is not owner/admin, redirect away
-      router.push('/profile');
+    // If we have a user but are waiting for the profile from our DB, do nothing yet.
+    // The component will show a loading skeleton.
+    if (!profile) {
+        return;
     }
 
-  }, [user, profile, authLoading, router, fetchOwnerData]);
+    // Once we have a user and their profile, check their role.
+    if (profile.role === 'boat_owner' || profile.role === 'admin') {
+        setIsOwner(true);
+        fetchOwnerData(user);
+    } else {
+        // If the user is not an owner or admin, they shouldn't be here.
+        router.push('/profile');
+    }
+}, [user, profile, authLoading, router, fetchOwnerData]);
 
 
   const handleAddBoat = async (e: React.FormEvent) => {
@@ -329,7 +329,7 @@ export default function DashboardPage() {
 
 
 
-  if (loading || authLoading) {
+  if (authLoading || loading) {
     return (
        <div className="flex min-h-dvh w-full items-center justify-center bg-background p-4">
         <div className="w-full max-w-4xl space-y-6">
