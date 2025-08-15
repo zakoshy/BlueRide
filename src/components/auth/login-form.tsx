@@ -74,16 +74,21 @@ export function LoginForm() {
   const handleSuccessfulLogin = async (user: User) => {
     // Ensure user is in our DB (for Google Sign-In cases)
     await saveUserToDb(user);
-    // Refetch profile to get the latest role
-    await refetchProfile(); 
     
-    // Fetch the role again after refetch because the one in useAuth context might be stale
-    const profileResponse = await fetch(`/api/users/${user.uid}`);
-    if (profileResponse.ok) {
+    // Explicitly refetch the profile data to ensure it's fresh
+    await refetchProfile();
+    
+    // Now, fetch the profile directly to get the guaranteed latest role for redirection
+    try {
+        const profileResponse = await fetch(`/api/users/${user.uid}`);
+        if (!profileResponse.ok) {
+            throw new Error("Failed to fetch user profile for redirection.");
+        }
         const profile = await profileResponse.json();
+        
         toast({ title: "Login Successful", description: "Welcome back!" });
 
-        // Role-based redirection
+        // Role-based redirection using the freshly fetched profile
         switch (profile.role) {
             case 'admin':
                 router.push('/admin');
@@ -99,8 +104,9 @@ export function LoginForm() {
                 router.push('/profile');
                 break;
         }
-    } else {
-        // Fallback if profile fetch fails
+    } catch (error) {
+        console.error(error);
+        // Fallback if profile fetch fails after a successful login
         toast({ title: "Login Successful", description: "Could not retrieve user role, redirecting to profile." });
         router.push('/profile');
     }
@@ -116,7 +122,7 @@ export function LoginForm() {
     } catch (error: any) {
        toast({
         title: "Login Failed",
-        description: "The email or password you entered is incorrect. Please double-check your credentials.",
+        description: "Could not sign in with Google. Please try again.",
         variant: "destructive",
       });
     } finally {
