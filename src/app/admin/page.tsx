@@ -274,6 +274,31 @@ export default function AdminPage() {
     }
   }
 
+    const handleBulkFareProposal = async (status: 'approved' | 'rejected') => {
+        const pendingIds = pendingProposals.map(p => p._id);
+        if (pendingIds.length === 0) return;
+
+        try {
+            const response = await fetch('/api/fare-proposals', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proposalIds: pendingIds, status }),
+            });
+
+            if (response.ok) {
+                toast({ title: "Success", description: `All pending proposals have been ${status}.` });
+                fetchAdminData(); // Refresh proposals list
+            } else {
+                const errorData = await response.json();
+                toast({ title: "Bulk Action Failed", description: errorData.message || "Could not process all proposals.", variant: "destructive" });
+            }
+        } catch (error) {
+            console.error("Error processing bulk fare proposals:", error);
+            toast({ title: "Error", description: "An unexpected error occurred during the bulk action.", variant: "destructive" });
+        }
+    };
+
+
   if (loading || authLoading) {
     return (
        <div className="flex min-h-dvh w-full items-center justify-center bg-background p-4">
@@ -485,9 +510,19 @@ export default function AdminPage() {
             </TabsContent>
              <TabsContent value="fares" className="mt-6">
                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2"><DollarSign/>Pending Fare Proposals</CardTitle>
-                      <CardDescription>Review and approve or reject fare changes proposed by boat owners.</CardDescription>
+                    <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><DollarSign/>Pending Fare Proposals</CardTitle>
+                            <CardDescription>Review and approve or reject fare changes proposed by boat owners.</CardDescription>
+                        </div>
+                        <div className="flex w-full sm:w-auto items-center gap-2">
+                             <Button variant="destructive" size="sm" onClick={() => handleBulkFareProposal('rejected')} disabled={pendingProposals.length === 0}>
+                                <Ban className="mr-2 h-4 w-4"/>Reject All
+                            </Button>
+                             <Button variant="default" size="sm" onClick={() => handleBulkFareProposal('approved')} disabled={pendingProposals.length === 0}>
+                                <CheckCircle className="mr-2 h-4 w-4"/>Approve All
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                          {pendingProposals.length > 0 ? (
@@ -647,5 +682,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

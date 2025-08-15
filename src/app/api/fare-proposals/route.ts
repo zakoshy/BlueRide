@@ -92,9 +92,9 @@ export async function POST(request: Request) {
 // PUT to approve/reject proposals from admin
 export async function PUT(request: Request) {
     try {
-        const { proposalId, status } = await request.json();
+        const { proposalId, proposalIds, status } = await request.json();
 
-        if (!proposalId || !status || !['approved', 'rejected'].includes(status)) {
+        if ((!proposalId && !proposalIds) || !status || !['approved', 'rejected'].includes(status)) {
             return NextResponse.json({ message: 'Missing or invalid required fields' }, { status: 400 });
         }
 
@@ -103,36 +103,47 @@ export async function PUT(request: Request) {
         const proposalsCollection = db.collection('fare_proposals');
         const routesCollection = db.collection('routes');
         
-        const proposal = await proposalsCollection.findOne({ _id: new ObjectId(proposalId) });
+        let message = 'Proposal processed successfully';
 
-        if (!proposal) {
-            return NextResponse.json({ message: 'Proposal not found' }, { status: 404 });
+        if(proposalId) {
+            // Handle single proposal
+            const proposal = await proposalsCollection.findOne({ _id: new ObjectId(proposalId) });
+            if (!proposal) return NextResponse.json({ message: 'Proposal not found' }, { status: 404 });
+            if (proposal.status !== 'pending') return NextResponse.json({ message: 'This proposal has already been processed.' }, { status: 409 });
+
+            await proposalsCollection.updateOne({ _id: new ObjectId(proposalId) }, { $set: { status: status } });
+            if (status === 'approved') {
+                await routesCollection.updateOne({ _id: new ObjectId(proposal.routeId) }, { $set: { fare_per_person_kes: proposal.proposedFare } });
+            }
+             message = `Proposal ${status} successfully`;
+        } else if (proposalIds && Array.isArray(proposalIds)) {
+            // Handle bulk proposals
+            const objectIds = proposalIds.map(id => new ObjectId(id));
+            
+            // Get all proposals to be approved for fare updates
+            if (status === 'approved') {
+                 const proposalsToUpdate = await proposalsCollection.find({ _id: { $in: objectIds }, status: 'pending' }).toArray();
+                 const bulkRouteUpdates = proposalsToUpdate.map(p => ({
+                    updateOne: {
+                        filter: { _id: p.routeId },
+                        update: { $set: { fare_per_person_kes: p.proposedFare } }
+                    }
+                 }));
+                 if(bulkRouteUpdates.length > 0) {
+                    await routesCollection.bulkWrite(bulkRouteUpdates);
+                 }
+            }
+
+            // Update status for all proposals
+            await proposalsCollection.updateMany({ _id: { $in: objectIds }, status: 'pending' }, { $set: { status: status } });
+            message = `All proposals have been ${status} successfully.`;
         }
 
-        if (proposal.status !== 'pending') {
-             return NextResponse.json({ message: 'This proposal has already been processed.' }, { status: 409 });
-        }
 
-        // Update the proposal status
-        await proposalsCollection.updateOne(
-            { _id: new ObjectId(proposalId) },
-            { $set: { status: status } }
-        );
-
-        // If approved, update the actual route fare
-        if (status === 'approved') {
-            await routesCollection.updateOne(
-                { _id: new ObjectId(proposal.routeId) },
-                { $set: { fare_per_person_kes: proposal.proposedFare } }
-            );
-        }
-
-        return NextResponse.json({ message: `Proposal ${status} successfully` }, { status: 200 });
+        return NextResponse.json({ message }, { status: 200 });
 
     } catch (error) {
         console.error('Error processing fare proposal:', error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
 }
-
-    
