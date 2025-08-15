@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign, TrendingUp } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign, TrendingUp, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -89,6 +89,11 @@ export default function DashboardPage() {
   
   const [isAdjustFareDialogOpen, setAdjustFareDialogOpen] = useState(false);
   const [fareAdjustmentPercent, setFareAdjustmentPercent] = useState([0]);
+
+  // State for single route adjustment dialog
+  const [isSingleAdjustDialogOpen, setSingleAdjustDialogOpen] = useState(false);
+  const [routeToAdjust, setRouteToAdjust] = useState<Route | null>(null);
+  const [singleFareAdjustmentPercent, setSingleFareAdjustmentPercent] = useState([0]);
 
 
 
@@ -232,7 +237,7 @@ export default function DashboardPage() {
         }
     };
 
-    const handleUpdateSingleFare = (route: Route) => {
+    const handleSubmitSingleProposal = (route: Route) => {
         const proposedFare = Number(fareChanges[route._id]);
         if (isNaN(proposedFare) || proposedFare <= 0 || proposedFare === route.fare_per_person_kes) {
             toast({ title: "Invalid Fare", description: "Please enter a valid, new fare.", variant: "destructive" });
@@ -281,6 +286,32 @@ export default function DashboardPage() {
         });
         setAdjustFareDialogOpen(false);
     }
+    
+    const handleSingleAdjustClick = (route: Route) => {
+        setRouteToAdjust(route);
+        setSingleFareAdjustmentPercent([0]);
+        setSingleAdjustDialogOpen(true);
+    };
+
+    const handleApplySinglePercentageChange = () => {
+        if (!routeToAdjust) return;
+
+        const percent = singleFareAdjustmentPercent[0];
+        const multiplier = 1 + (percent / 100);
+        const newFare = Math.round(routeToAdjust.fare_per_person_kes * multiplier);
+        
+        // Update the input field for this specific route
+        handleFareInputChange(routeToAdjust._id, newFare.toString());
+        
+        toast({
+            title: "Fare Updated",
+            description: `New fare for ${routeToAdjust.from} to ${routeToAdjust.to} is staged at Ksh ${newFare.toLocaleString()}.`,
+        });
+        
+        setSingleAdjustDialogOpen(false);
+        setRouteToAdjust(null);
+    };
+
 
 
   if (loading || authLoading) {
@@ -409,7 +440,7 @@ export default function DashboardPage() {
                                     <TableHead>To</TableHead>
                                     <TableHead>Current Fare (Ksh)</TableHead>
                                     <TableHead>New Fare (Ksh)</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -427,14 +458,21 @@ export default function DashboardPage() {
                                                 onChange={(e) => handleFareInputChange(route._id, e.target.value)}
                                             />
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right space-x-2">
                                             <Button 
                                                 variant="outline" 
                                                 size="sm"
-                                                onClick={() => handleUpdateSingleFare(route)}
+                                                onClick={() => handleSingleAdjustClick(route)}
+                                            >
+                                               <Settings2 className="mr-2 h-4 w-4"/> Adjust
+                                            </Button>
+                                             <Button 
+                                                variant="default" 
+                                                size="sm"
+                                                onClick={() => handleSubmitSingleProposal(route)}
                                                 disabled={!fareChanges[route._id] || Number(fareChanges[route._id]) === route.fare_per_person_kes}
                                             >
-                                               <Send className="mr-2 h-4 w-4"/> Propose Change
+                                               <Send className="mr-2 h-4 w-4"/> Propose
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -578,6 +616,45 @@ export default function DashboardPage() {
             </TabsContent>
         </Tabs>
       </main>
+
+        {/* Single Route Fare Adjustment Dialog */}
+        <Dialog open={isSingleAdjustDialogOpen} onOpenChange={setSingleAdjustDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Adjust Fare for Route</DialogTitle>
+                    <DialogDescription>
+                        <p className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</p>
+                        <p>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</p>
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="text-center">
+                        <span className="text-4xl font-bold">
+                            {singleFareAdjustmentPercent[0] > 0 && '+'}
+                            {singleFareAdjustmentPercent[0]}%
+                        </span>
+                    </div>
+                    <Slider
+                        defaultValue={[0]}
+                        value={singleFareAdjustmentPercent}
+                        onValueChange={setSingleFareAdjustmentPercent}
+                        max={15}
+                        min={-15}
+                        step={1}
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>-15%</span>
+                        <span>0%</span>
+                        <span>+15%</span>
+                    </div>
+                </div>
+                <CardFooter>
+                    <Button className="w-full" onClick={handleApplySinglePercentageChange}>Update Staged Fare</Button>
+                </CardFooter>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
+
+    
