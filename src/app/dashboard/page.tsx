@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign, TrendingUp, Settings2 } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign, TrendingUp, Settings2, BarChart3, Lightbulb, Banknote, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,6 +23,7 @@ import type { User as FirebaseUser } from "firebase/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { getCoastalBusinessAdvice, type CoastalAdviceOutput } from "@/ai/flows/coastal-events-flow";
 
 
 interface Boat {
@@ -66,6 +67,23 @@ interface Route {
     fare_per_person_kes: number;
 }
 
+// ERP-specific types
+interface FinancialSummary {
+    totalRevenue: number;
+    totalOwnerShare: number;
+    totalCaptainCommission: number;
+    tripCount: number;
+}
+
+interface CrewPayout {
+    captainId: string;
+    name: string;
+    email: string;
+    totalCommission: number;
+    tripCount: number;
+}
+
+
 export default function DashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -94,19 +112,29 @@ export default function DashboardPage() {
   const [isSingleAdjustDialogOpen, setSingleAdjustDialogOpen] = useState(false);
   const [routeToAdjust, setRouteToAdjust] = useState<Route | null>(null);
   const [singleFareAdjustmentPercent, setSingleFareAdjustmentPercent] = useState([0]);
+  
+  // AI State
+  const [advice, setAdvice] = useState<CoastalAdviceOutput | null>(null);
+  const [isAdviceLoading, setIsAdviceLoading] = useState(true);
 
+  // ERP State
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
+  const [crewPayouts, setCrewPayouts] = useState<CrewPayout[]>([]);
 
 
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
     if (!currentUser) return;
     setLoading(true);
-    // Fetch boats, bookings, captains, and routes in parallel
+    setIsAdviceLoading(true);
     try {
-        const [boatsRes, bookingsRes, captainsRes, routesRes] = await Promise.all([
+        const [boatsRes, bookingsRes, captainsRes, routesRes, adviceRes, finSummaryRes, crewPayoutsRes] = await Promise.all([
             fetch(`/api/boats?ownerId=${currentUser.uid}`),
             fetch(`/api/bookings/owner/${currentUser.uid}`),
             fetch('/api/captains'),
-            fetch('/api/routes/fares')
+            fetch('/api/routes/fares'),
+            getCoastalBusinessAdvice(),
+            fetch(`/api/erp/owner/${currentUser.uid}/financial-summary`),
+            fetch(`/api/erp/owner/${currentUser.uid}/crew-payouts`),
         ]);
 
         if (boatsRes.ok) setBoats(await boatsRes.json());
@@ -121,42 +149,45 @@ export default function DashboardPage() {
         if (routesRes.ok) setRoutes(await routesRes.json());
         else toast({ title: "Error", description: "Could not fetch route fares.", variant: "destructive" });
         
+        setAdvice(adviceRes);
+
+        if (finSummaryRes.ok) setFinancialSummary(await finSummaryRes.json());
+        else toast({ title: "Error", description: "Could not fetch financial summary.", variant: "destructive" });
+        
+        if (crewPayoutsRes.ok) setCrewPayouts(await crewPayoutsRes.json());
+        else toast({ title: "Error", description: "Could not fetch crew payouts.", variant: "destructive" });
+
     } catch (error) {
         console.error("Failed to fetch owner data", error);
         toast({ title: "Error", description: "An unexpected error occurred while fetching your data.", variant: "destructive" });
+        if (error instanceof Error && error.message.includes('AI advisor')) {
+            setAdvice(null);
+        }
     } finally {
         setLoading(false);
+        setIsAdviceLoading(false);
     }
   }, [toast]);
 
  useEffect(() => {
-    // Wait for the auth state to be fully resolved
     if (authLoading) {
-        setLoading(true);
-        return;
+      setLoading(true);
+      return;
     }
-
-    // If auth is resolved and there's no user, redirect to login
-    if (!user) {
+    if (!user || !profile) {
+      if (!authLoading) {
         router.push('/login');
-        return;
+      }
+      return;
     }
 
-    // If there is a user, but we're still waiting for the DB profile
-    if (!profile) {
-        setLoading(true);
-        return;
-    }
-
-    // Now we have user and profile, we can make decisions
     if (profile.role === 'boat_owner' || profile.role === 'admin') {
-        setIsOwner(true);
-        fetchOwnerData(user);
+      setIsOwner(true);
+      fetchOwnerData(user);
     } else {
-        // If the user does not have the correct role, redirect away
-        router.push('/profile');
+      router.push('/profile');
     }
-}, [user, profile, authLoading, router, fetchOwnerData]);
+  }, [user, profile, authLoading, router, fetchOwnerData]);
 
 
   const handleAddBoat = async (e: React.FormEvent) => {
@@ -235,7 +266,6 @@ export default function DashboardPage() {
                     title: "Proposals Submitted",
                     description: "Your fare change proposals have been sent to an admin for review.",
                 });
-                // Clear the submitted changes from the local state
                 const submittedIds = proposals.map(p => p.routeId);
                 setFareChanges(prev => {
                     const next = { ...prev };
@@ -288,7 +318,6 @@ export default function DashboardPage() {
         routes.forEach(route => {
             const currentFare = route.fare_per_person_kes;
             const newFare = Math.round(currentFare * multiplier);
-            // Only stage the change if it's different from the current fare
             if (newFare !== currentFare) {
                  newFareChanges[route._id] = newFare;
             }
@@ -315,7 +344,6 @@ export default function DashboardPage() {
         const multiplier = 1 + (percent / 100);
         const newFare = Math.round(routeToAdjust.fare_per_person_kes * multiplier);
         
-        // Update the input field for this specific route
         handleFareInputChange(routeToAdjust._id, newFare.toString());
         
         toast({
@@ -387,14 +415,56 @@ export default function DashboardPage() {
        <Header />
 
       <main className="container mx-auto p-4 sm:p-6 md:p-8">
-        <h1 className="text-3xl font-bold mb-2">Welcome, {user?.displayName || 'Owner'}!</h1>
-        <p className="text-muted-foreground mb-8">Manage your boats, bookings, and route pricing below.</p>
+        <div className="mb-6 space-y-2">
+            <h1 className="text-3xl font-bold">Welcome, {user?.displayName || 'Owner'}!</h1>
+            <p className="text-muted-foreground">Manage your boats, bookings, and route pricing below.</p>
+        </div>
+
+        <Card className="mb-8">
+             <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Lightbulb /> Business Intelligence</CardTitle>
+                <CardDescription>AI-powered insights to help you navigate the market.</CardDescription>
+             </CardHeader>
+             <CardContent>
+                {isAdviceLoading ? (
+                    <div className="space-y-4">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                    </div>
+                ) : advice ? (
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="font-semibold">Seasonal Outlook</h4>
+                            <p className="text-sm text-muted-foreground">{advice.seasonalOutlook}</p>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold">Upcoming Events & Opportunities</h4>
+                            <ul className="list-disc pl-5 mt-2 space-y-2 text-sm">
+                                {advice.upcomingEvents.map((item, index) => (
+                                    <li key={index}>
+                                        <span className="font-semibold">{item.event} ({item.date}):</span>
+                                        <span className="text-muted-foreground ml-1">{item.advice}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                         <div>
+                            <h4 className="font-semibold">Strategic Recommendation</h4>
+                            <p className="text-sm text-muted-foreground">{advice.strategicRecommendation}</p>
+                        </div>
+                    </div>
+                ) : (
+                     <p className="text-sm text-muted-foreground">Could not load business advice at this time.</p>
+                )}
+             </CardContent>
+        </Card>
         
         <Tabs defaultValue="fares">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="fares">Route Fares</TabsTrigger>
                 <TabsTrigger value="bookings">Booking History</TabsTrigger>
                 <TabsTrigger value="boats">My Fleet</TabsTrigger>
+                <TabsTrigger value="erp">My ERP</TabsTrigger>
             </TabsList>
 
             <TabsContent value="fares" className="mt-6 space-y-8">
@@ -629,17 +699,93 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
             </TabsContent>
+
+            <TabsContent value="erp" className="mt-6 space-y-8">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><BarChart3 /> Financial Summary</CardTitle>
+                        <CardDescription>A summary of your earnings from all your boats. Does not include the platform fee.</CardDescription>
+                    </CardHeader>
+                     <CardContent>
+                        {financialSummary ? (
+                             <div className="grid gap-4 md:grid-cols-3">
+                                <Card className="p-4">
+                                    <CardHeader className="p-2 pt-0">
+                                            <CardTitle className="text-sm font-medium flex items-center justify-between">Your Payout <Banknote/></CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-2 pb-0">
+                                        <div className="text-2xl font-bold">Ksh {financialSummary.totalOwnerShare.toLocaleString()}</div>
+                                        <p className="text-xs text-muted-foreground">From {financialSummary.tripCount} completed trips</p>
+                                    </CardContent>
+                                </Card>
+                                <Card className="p-4">
+                                    <CardHeader className="p-2 pt-0">
+                                            <CardTitle className="text-sm font-medium flex items-center justify-between">Captain Payouts <UserCheck/></CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-2 pb-0">
+                                        <div className="text-2xl font-bold">Ksh {financialSummary.totalCaptainCommission.toLocaleString()}</div>
+                                        <p className="text-xs text-muted-foreground">Total paid to your captains</p>
+                                    </CardContent>
+                                </Card>
+                                 <Card className="p-4 bg-blue-50">
+                                    <CardHeader className="p-2 pt-0">
+                                            <CardTitle className="text-sm font-medium flex items-center justify-between">Total Gross Revenue <DollarSign/></CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-2 pb-0">
+                                        <div className="text-2xl font-bold">Ksh {financialSummary.totalRevenue.toLocaleString()}</div>
+                                        <p className="text-xs text-muted-foreground">Your share + Captain share</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        ) : (
+                             <p className="text-center text-muted-foreground py-8">No financial data to display yet.</p>
+                        )}
+                    </CardContent>
+                 </Card>
+                  <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><UserCheck /> Captain Payout Report</CardTitle>
+                        <CardDescription>Breakdown of commissions earned by each captain on your boats.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         {crewPayouts.length > 0 ? (
+                           <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Captain</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>Trips</TableHead>
+                                        <TableHead className="text-right">Commission Earned</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {crewPayouts.map(captain => (
+                                        <TableRow key={captain.captainId}>
+                                            <TableCell className="font-medium">{captain.name}</TableCell>
+                                            <TableCell>{captain.email}</TableCell>
+                                            <TableCell>{captain.tripCount}</TableCell>
+                                            <TableCell className="text-right font-semibold text-green-600">Ksh {captain.totalCommission.toLocaleString()}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                           </Table>
+                        ) : (
+                            <p className="text-center text-muted-foreground py-8">Your assigned captains have not completed any trips yet.</p>
+                        )}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
         </Tabs>
       </main>
 
-        {/* Single Route Fare Adjustment Dialog */}
         <Dialog open={isSingleAdjustDialogOpen} onOpenChange={setSingleAdjustDialogOpen}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Adjust Fare for Route</DialogTitle>
                     <DialogDescription>
-                        <div className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</div>
                         <div>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</div>
+                        <div className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</div>
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
@@ -671,7 +817,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
-
-    
