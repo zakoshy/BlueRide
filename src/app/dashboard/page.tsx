@@ -129,18 +129,33 @@ export default function DashboardPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (authLoading) return;
+    // Wait for the auth state to be fully resolved
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+    
+    // If auth is resolved and there's no user, redirect to login
     if (!user) {
       router.push('/login');
       return;
     }
-    if (profile?.role === 'boat_owner' || profile?.role === 'admin') {
+
+    // If we have a user but are waiting for the profile, keep loading
+    if (!profile) {
+        setLoading(true);
+        return;
+    }
+
+    // Now we have user and profile, check the role
+    if (profile.role === 'boat_owner' || profile.role === 'admin') {
       setIsOwner(true);
-      fetchOwnerData(user);
+      fetchOwnerData(user).finally(() => setLoading(false));
     } else {
+      // If role is not owner/admin, redirect away
       router.push('/profile');
     }
-    setLoading(false);
+
   }, [user, profile, authLoading, router, fetchOwnerData]);
 
 
@@ -656,5 +671,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
