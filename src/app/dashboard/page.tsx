@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, Sailboat, CheckSquare, Send, DollarSign, TrendingUp, Settings2, BarChart3, Banknote, UserCheck, Route as RouteIcon, Trash2 } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, Sailboat, CheckSquare, Send, DollarSign, TrendingUp, Settings2, BarChart3, Banknote, UserCheck, Route as RouteIcon, Trash2, BrainCircuit, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -131,7 +131,8 @@ export default function DashboardPage() {
   // AI Advisor State
   const [advice, setAdvice] = useState<CoastalAdviceOutput | null>(null);
   const [isAdviceLoading, setIsAdviceLoading] = useState(true);
-  
+  const [isAiAdviceVisible, setIsAiAdviceVisible] = useState(false);
+
   // State for route search in dialogs
   const [routeSearch, setRouteSearch] = useState("");
 
@@ -164,12 +165,10 @@ export default function DashboardPage() {
         else toast({ title: "Error", description: "Could not fetch route fares.", variant: "destructive" });
 
         if (finSummaryRes.ok) setFinancialSummary(await finSummaryRes.json());
-        else toast({ title: "Error", description: "Could not fetch financial summary.", variant: "destructive" });
         
         if (crewPayoutsRes.ok) setCrewPayouts(await crewPayoutsRes.json());
-        else toast({ title: "Error", description: "Could not fetch crew payouts.", variant: "destructive" });
-
-        setAdvice(adviceRes);
+        
+        if(adviceRes) setAdvice(adviceRes);
 
     } catch (error) {
         console.error("Failed to fetch owner data", error);
@@ -504,7 +503,22 @@ export default function DashboardPage() {
             <p className="text-muted-foreground">Manage your boats, bookings, and route pricing below.</p>
         </div>
         
-        <Card className="mb-8">
+        <div className="mb-6">
+            <Button
+                variant="outline"
+                onClick={() => setIsAiAdviceVisible(!isAiAdviceVisible)}
+                className="w-full justify-between"
+            >
+                <div className="flex items-center gap-2">
+                    <BrainCircuit className="text-primary"/>
+                    <span>AI Business Intelligence</span>
+                </div>
+                <ChevronDown className={`transition-transform ${isAiAdviceVisible ? 'rotate-180' : ''}`} />
+            </Button>
+        </div>
+
+        {isAiAdviceVisible && (
+        <Card className="mb-8 animate-in fade-in-50 slide-in-from-top-5 duration-300">
           <CardHeader>
             <CardTitle>AI Business Intelligence</CardTitle>
             <CardDescription>Actionable insights to help you maximize your business potential.</CardDescription>
@@ -542,6 +556,7 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
         <Tabs defaultValue="boats">
             <TabsList className="grid w-full grid-cols-4">
@@ -858,7 +873,7 @@ export default function DashboardPage() {
                                         <p className="text-xs text-muted-foreground">Total paid to your captains</p>
                                     </CardContent>
                                 </Card>
-                                 <Card className="p-4 bg-blue-50">
+                                 <Card className="p-4 bg-blue-50 dark:bg-blue-900/20">
                                     <CardHeader className="p-2 pt-0">
                                             <CardTitle className="text-sm font-medium flex items-center justify-between">Total Gross Revenue <DollarSign/></CardTitle>
                                     </CardHeader>
@@ -915,8 +930,8 @@ export default function DashboardPage() {
                 <DialogHeader>
                     <DialogTitle>Adjust Fare for Route</DialogTitle>
                     <div className="text-sm text-muted-foreground pt-2">
-                        <div>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</div>
                         <div className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</div>
+                        <div>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</div>
                     </div>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
@@ -925,6 +940,9 @@ export default function DashboardPage() {
                             {singleFareAdjustmentPercent[0] > 0 && '+'}
                             {singleFareAdjustmentPercent[0]}%
                         </span>
+                        <span className="text-2xl text-muted-foreground"> (New: Ksh {
+                            routeToAdjust ? Math.round(routeToAdjust.fare_per_person_kes * (1 + singleFareAdjustmentPercent[0] / 100)).toLocaleString() : ''
+                        })</span>
                     </div>
                     <Slider
                         defaultValue={[0]}
@@ -989,3 +1007,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
