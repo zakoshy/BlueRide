@@ -3,7 +3,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,6 +131,9 @@ export default function DashboardPage() {
   // AI Advisor State
   const [advice, setAdvice] = useState<CoastalAdviceOutput | null>(null);
   const [isAdviceLoading, setIsAdviceLoading] = useState(true);
+  
+  // State for route search in dialogs
+  const [routeSearch, setRouteSearch] = useState("");
 
 
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
@@ -224,6 +227,7 @@ export default function DashboardPage() {
             setNewBoatDescription('');
             setNewBoatLicense('');
             setNewBoatRoutes([]);
+            setRouteSearch('');
             setAddBoatDialogOpen(false);
             fetchOwnerData(user); // Refresh the list
         } else {
@@ -367,6 +371,7 @@ export default function DashboardPage() {
 
     const handleOpenManageRoutes = async (boat: Boat) => {
         setBoatToManageRoutes(boat);
+        setRouteSearch('');
         setAssignedRoutes([]); // Clear previous state
         try {
             const response = await fetch(`/api/boats/routes?boatId=${boat._id}`);
@@ -422,6 +427,13 @@ export default function DashboardPage() {
              toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
         }
     };
+
+    const filteredDialogRoutes = useMemo(() => {
+        return routes.filter(route => 
+            route.from.toLowerCase().includes(routeSearch.toLowerCase()) ||
+            route.to.toLowerCase().includes(routeSearch.toLowerCase())
+        );
+    }, [routes, routeSearch]);
 
 
   if (authLoading || loading) {
@@ -701,7 +713,7 @@ export default function DashboardPage() {
                         </div>
                         <Dialog open={isAddBoatDialogOpen} onOpenChange={setAddBoatDialogOpen}>
                             <DialogTrigger asChild>
-                                 <Button><PlusCircle/>Add New Boat</Button>
+                                 <Button onClick={() => setRouteSearch('')}><PlusCircle/>Add New Boat</Button>
                             </DialogTrigger>
                              <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
@@ -710,7 +722,8 @@ export default function DashboardPage() {
                                     Fill in the details and assign routes. The boat will be 'Pending Validation'.
                                 </DialogDescription>
                                 </DialogHeader>
-                                <form onSubmit={handleAddBoat}>
+                                <ScrollArea className="max-h-[70vh]">
+                                <form onSubmit={handleAddBoat} className="px-4 py-2">
                                 <div className="grid gap-4 py-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="boat-name">Name</Label>
@@ -745,9 +758,15 @@ export default function DashboardPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Assign Routes</Label>
+                                        <Input 
+                                            placeholder="Search routes..."
+                                            value={routeSearch}
+                                            onChange={(e) => setRouteSearch(e.target.value)}
+                                            className="mb-2"
+                                        />
                                          <ScrollArea className="h-40 rounded-md border p-2">
                                             <div className="space-y-1">
-                                            {routes.map(route => (
+                                            {filteredDialogRoutes.map(route => (
                                                 <div key={route._id} className="flex items-center space-x-2 p-1">
                                                     <Checkbox
                                                         id={`new-boat-route-${route._id}`}
@@ -767,6 +786,7 @@ export default function DashboardPage() {
                                     <Button type="submit" className="w-full">Save Boat</Button>
                                 </DialogFooter>
                                 </form>
+                                </ScrollArea>
                             </DialogContent>
                         </Dialog>
                     </CardHeader>
@@ -894,7 +914,7 @@ export default function DashboardPage() {
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Adjust Fare for Route</DialogTitle>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground pt-2">
                         <div>Current Fare: Ksh {routeToAdjust?.fare_per_person_kes.toLocaleString()}</div>
                         <div className="font-semibold">{routeToAdjust?.from} to {routeToAdjust?.to}</div>
                     </div>
@@ -935,23 +955,31 @@ export default function DashboardPage() {
                         Select the routes this boat will service.
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="max-h-[60vh] my-4">
-                    <div className="p-1 space-y-2">
-                        {routes.map(route => (
-                            <div key={route._id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50">
-                                <Checkbox
-                                    id={`route-${route._id}`}
-                                    checked={assignedRoutes.includes(route._id)}
-                                    onCheckedChange={(checked) => handleRouteAssignmentChange(route._id, !!checked)}
-                                />
-                                <Label htmlFor={`route-${route._id}`} className="flex-1 cursor-pointer">
-                                    <span className="font-semibold">{route.from}</span> to <span className="font-semibold">{route.to}</span>
-                                    <span className="text-xs text-muted-foreground ml-2">(Ksh {route.fare_per_person_kes})</span>
-                                </Label>
-                            </div>
-                        ))}
-                    </div>
-                </ScrollArea>
+                 <div className="py-2">
+                    <Input 
+                        placeholder="Search routes..."
+                        value={routeSearch}
+                        onChange={(e) => setRouteSearch(e.target.value)}
+                        className="mb-2"
+                    />
+                    <ScrollArea className="max-h-[50vh] mt-2">
+                        <div className="p-1 space-y-2">
+                            {filteredDialogRoutes.map(route => (
+                                <div key={route._id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50">
+                                    <Checkbox
+                                        id={`route-${route._id}`}
+                                        checked={assignedRoutes.includes(route._id)}
+                                        onCheckedChange={(checked) => handleRouteAssignmentChange(route._id, !!checked)}
+                                    />
+                                    <Label htmlFor={`route-${route._id}`} className="flex-1 cursor-pointer">
+                                        <span className="font-semibold">{route.from}</span> to <span className="font-semibold">{route.to}</span>
+                                        <span className="text-xs text-muted-foreground ml-2">(Ksh {route.fare_per_person_kes})</span>
+                                    </Label>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
                 <DialogFooter>
                      <Button variant="outline" onClick={() => setManageRoutesOpen(false)}>Cancel</Button>
                     <Button onClick={handleSaveRoutesForBoat}>Save Routes</Button>
