@@ -112,6 +112,7 @@ export async function POST(request: Request) {
       finalFare: baseFare, // Initially, final fare is the base fare
       adjustmentPercent: 0, // Initially, no adjustment
       status: 'completed', // Auto-complete bookings upon creation/payment
+      hasBeenReviewed: false, // New field for tracking reviews
       createdAt: new Date(),
     };
 
@@ -164,6 +165,7 @@ export async function GET(request: Request) {
                     seats: 1,
                     baseFare: 1,
                     finalFare: 1,
+                    hasBeenReviewed: 1, // Pass this to the frontend
                     boat: { 
                         name: '$boatInfo.name',
                         capacity: '$boatInfo.capacity'
@@ -219,3 +221,5 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
+
+    

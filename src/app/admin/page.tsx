@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -55,6 +55,16 @@ interface FareProposal {
     route: { from: string; to: string; currentFare: number };
 }
 
+interface Review {
+    _id: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+    rider: { name: string };
+    boat: { name: string };
+    owner: { name: string };
+}
+
 export default function AdminPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -65,6 +75,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
   const [fareProposals, setFareProposals] = useState<FareProposal[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   
   const [selectedOwner, setSelectedOwner] = useState<ManagedUser | null>(null);
   const [isManageBoatsDialogOpen, setManageBoatsDialogOpen] = useState(false);
@@ -83,9 +94,10 @@ export default function AdminPage() {
 
   const fetchAdminData = useCallback(async () => {
     try {
-        const [usersRes, proposalsRes] = await Promise.all([
+        const [usersRes, proposalsRes, reviewsRes] = await Promise.all([
             fetch('/api/admin/users'),
-            fetch('/api/fare-proposals')
+            fetch('/api/fare-proposals'),
+            fetch('/api/reviews'),
         ]);
 
       if (usersRes.ok) setUsers(await usersRes.json());
@@ -93,6 +105,9 @@ export default function AdminPage() {
 
       if (proposalsRes.ok) setFareProposals(await proposalsRes.json());
       else toast({ title: "Error", description: "Failed to fetch fare proposals.", variant: "destructive" });
+
+      if (reviewsRes.ok) setReviews(await reviewsRes.json());
+      else toast({ title: "Error", description: "Failed to fetch reviews.", variant: "destructive" });
 
     } catch (error) {
       console.error("Failed to fetch admin data", error);
@@ -400,9 +415,10 @@ export default function AdminPage() {
         <p className="text-muted-foreground mb-8">Manage users, roles, boats, and review fare proposals.</p>
         
         <Tabs defaultValue="users">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="users">User Management</TabsTrigger>
                 <TabsTrigger value="fares">Fare Proposals {pendingProposals.length > 0 && <Badge className="ml-2">{pendingProposals.length}</Badge>}</TabsTrigger>
+                <TabsTrigger value="reviews">Rider Reviews</TabsTrigger>
                 <TabsTrigger value="erp">ERP &amp; Analytics</TabsTrigger>
             </TabsList>
             <TabsContent value="users" className="mt-6">
@@ -563,6 +579,48 @@ export default function AdminPage() {
                     </CardContent>
                  </Card>
             </TabsContent>
+            <TabsContent value="reviews" className="mt-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><MessageSquare /> Rider Reviews</CardTitle>
+                        <CardDescription>Feedback submitted by riders about their trips. Use this to monitor service quality.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {reviews.length > 0 ? (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Rider</TableHead>
+                                        <TableHead>Boat (Owner)</TableHead>
+                                        <TableHead>Rating</TableHead>
+                                        <TableHead>Comment</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {reviews.map((review) => (
+                                        <TableRow key={review._id}>
+                                            <TableCell>{new Date(review.createdAt).toLocaleDateString()}</TableCell>
+                                            <TableCell>{review.rider.name}</TableCell>
+                                            <TableCell>{review.boat.name} <span className="text-muted-foreground text-xs">({review.owner.name})</span></TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-1">
+                                                    {Array.from({ length: 5 }).map((_, i) => (
+                                                        <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} />
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground text-sm">{review.comment}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <p className="text-center text-muted-foreground py-8">No reviews have been submitted yet.</p>
+                        )}
+                    </CardContent>
+                </Card>
+            </TabsContent>
             <TabsContent value="erp" className="mt-6">
                 <Card>
                     <CardHeader>
@@ -682,3 +740,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    

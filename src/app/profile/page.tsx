@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2 } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Separator } from "@/components/ui/separator";
 import QRCode from 'qrcode';
 import Image from "next/image";
+import { Textarea } from "@/components/ui/textarea";
 
 
 // Define types for our data structures
@@ -51,6 +52,7 @@ interface Booking {
   seats?: number;
   baseFare: number;
   finalFare?: number;
+  hasBeenReviewed?: boolean;
   boat?: {
     name: string;
     capacity: number;
@@ -93,6 +95,13 @@ export default function ProfilePage() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const receiptRef = useRef<HTMLDivElement>(null);
   
+    // Review State
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState("");
+
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
     documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
@@ -167,7 +176,7 @@ export default function ProfilePage() {
 
     fetchPickupLocations();
     fetchUserBookings();
-  }, [fetchUserBookings]);
+  }, [fetchUserBookings, toast]);
 
   // Fetch destinations when pickup changes
   useEffect(() => {
@@ -302,6 +311,55 @@ export default function ProfilePage() {
         toast({ title: "Error", description: "An unexpected error occurred while cancelling the booking.", variant: "destructive" });
     }
   };
+
+    const handleOpenReviewDialog = (booking: Booking) => {
+        setReviewBooking(booking);
+        setRating(0);
+        setComment("");
+        setIsReviewDialogOpen(true);
+    };
+
+    const handleReviewSubmit = async () => {
+        if (!reviewBooking || rating === 0) {
+            toast({
+                title: "Incomplete Review",
+                description: "Please provide a star rating to submit your review.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/reviews', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bookingId: reviewBooking._id,
+                    rating: rating,
+                    comment: comment,
+                }),
+            });
+
+            if (response.ok) {
+                toast({ title: "Review Submitted", description: "Thank you for your feedback!" });
+                setIsReviewDialogOpen(false);
+                fetchUserBookings(); // Refresh bookings to update review status
+            } else {
+                const errorData = await response.json();
+                toast({
+                    title: "Review Failed",
+                    description: errorData.message || "Could not submit your review.",
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "An unexpected error occurred while submitting your review.",
+                variant: "destructive",
+            });
+        }
+    };
 
 
   if (loading || !user) {
@@ -441,7 +499,7 @@ export default function ProfilePage() {
                 <Card className="mt-6">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><BookCopy/>Your Booking History</CardTitle>
-                        <CardDescription>Here are all your past and upcoming trips. You can view or print your receipt from here.</CardDescription>
+                        <CardDescription>Here are all your past and upcoming trips. You can view your receipt or leave a review.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {isFetchingBookings ? (
@@ -464,7 +522,13 @@ export default function ProfilePage() {
                                              {(booking.status === 'confirmed' || booking.status === 'completed') && (
                                                 <Button variant="outline" size="sm" onClick={() => handleViewReceipt(booking)}>
                                                     <Printer className="mr-2 h-4 w-4"/>
-                                                    View Receipt
+                                                    Receipt
+                                                </Button>
+                                             )}
+                                             {booking.status === 'completed' && !booking.hasBeenReviewed && (
+                                                <Button variant="default" size="sm" onClick={() => handleOpenReviewDialog(booking)}>
+                                                    <Star className="mr-2 h-4 w-4" />
+                                                    Leave Review
                                                 </Button>
                                              )}
                                             {(booking.status !== 'completed' && booking.status !== 'cancelled') && (
@@ -686,7 +750,55 @@ export default function ProfilePage() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        {/* Review Dialog */}
+        <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Leave a Review for Your Trip</DialogTitle>
+                    <DialogDescription>
+                        How was your trip on {reviewBooking?.boat?.name} from {reviewBooking?.pickup} to {reviewBooking?.destination}?
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div>
+                        <Label>Your Rating</Label>
+                        <div className="flex items-center gap-2 mt-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                    key={star}
+                                    className={`h-8 w-8 cursor-pointer transition-colors ${
+                                        (hoverRating || rating) >= star
+                                            ? 'text-yellow-400 fill-yellow-400'
+                                            : 'text-gray-300'
+                                    }`}
+                                    onClick={() => setRating(star)}
+                                    onMouseEnter={() => setHoverRating(star)}
+                                    onMouseLeave={() => setHoverRating(0)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="comment">Your Comments (Optional)</Label>
+                        <Textarea
+                            id="comment"
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="Tell us more about your experience..."
+                            className="mt-2"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsReviewDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleReviewSubmit} disabled={rating === 0}>Submit Review</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
   );
+
+    
 
     
