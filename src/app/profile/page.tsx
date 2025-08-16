@@ -692,7 +692,7 @@ export default function ProfilePage() {
                                 <h3 className="text-xl font-bold text-primary">BlueRide</h3>
                                 <p className="text-xs text-muted-foreground">Thank you for riding with us!</p>
                             </div>
-                             <Sailboat className="h-8 w-8 text-primary" />
+                            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={32} height={32} className="h-8 w-8 rounded-md" />
                         </div>
 
                         <div className="space-y-4">
@@ -803,3 +803,4 @@ export default function ProfilePage() {
     
 
     
+
