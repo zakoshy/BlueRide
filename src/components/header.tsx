@@ -40,7 +40,7 @@ export function Header() {
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={32} height={32} className="h-8 w-8 rounded-md" />
+            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={40} height={40} className="h-10 w-10 rounded-md" />
             <span className="hidden font-bold sm:inline-block">
               BlueRide
             </span>
@@ -60,7 +60,7 @@ export function Header() {
           </SheetTrigger>
           <SheetContent side="left">
             <Link href="/" className="mr-6 flex items-center space-x-2">
-              <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={32} height={32} className="h-8 w-8 rounded-md" />
+              <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={40} height={40} className="h-10 w-10 rounded-md" />
               <span className="font-bold">BlueRide</span>
             </Link>
             <div className="mt-6 flex flex-col gap-4">
