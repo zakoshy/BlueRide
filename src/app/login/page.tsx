@@ -1,8 +1,9 @@
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from 'next/link';
-import { ArrowLeft, Car } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
 
 export default function LoginPage() {
   return (
@@ -16,7 +17,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-            <Car className="mx-auto h-12 w-12 text-primary"/>
+            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={48} height={48} className="mx-auto h-12 w-12 rounded-lg"/>
             <h1 className="text-3xl font-bold mt-2">Sign In to BlueRide</h1>
             <p className="text-muted-foreground">Enter your credentials to access your account.</p>
         </div>

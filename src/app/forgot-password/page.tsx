@@ -2,8 +2,9 @@
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from 'next/link';
-import { ArrowLeft, Car } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
 
 export default function ForgotPasswordPage() {
   return (
@@ -17,7 +18,7 @@ export default function ForgotPasswordPage() {
 
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-            <Car className="mx-auto h-12 w-12 text-primary"/>
+            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={48} height={48} className="mx-auto h-12 w-12 rounded-lg"/>
             <h1 className="text-3xl font-bold mt-2">Forgot Your Password?</h1>
             <p className="text-muted-foreground">No problem. Enter your email below and we'll send you a link to reset it.</p>
         </div>

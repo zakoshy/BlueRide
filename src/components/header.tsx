@@ -4,13 +4,14 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Car, LogOut, User as UserIcon, Ship, Shield, Anchor } from 'lucide-react';
+import { Menu, LogOut, User as UserIcon, Ship, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase/config';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
+import Image from 'next/image';
 
 export function Header() {
   const { user, profile, loading } = useAuth();
@@ -39,7 +40,7 @@ export function Header() {
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Car className="h-6 w-6 text-primary" />
+            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={32} height={32} className="h-8 w-8 rounded-md" />
             <span className="hidden font-bold sm:inline-block">
               BlueRide
             </span>
@@ -59,7 +60,7 @@ export function Header() {
           </SheetTrigger>
           <SheetContent side="left">
             <Link href="/" className="mr-6 flex items-center space-x-2">
-              <Car className="h-6 w-6 text-primary" />
+              <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={32} height={32} className="h-8 w-8 rounded-md" />
               <span className="font-bold">BlueRide</span>
             </Link>
             <div className="mt-6 flex flex-col gap-4">
