@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 // POST a new boat
 export async function POST(request: Request) {
   try {
-    const { name, capacity, description, ownerId, licenseNumber, type } = await request.json();
+    const { name, capacity, description, ownerId, licenseNumber, type, routeIds } = await request.json();
 
     if (!name || !capacity || !ownerId || !licenseNumber || !type) {
       return NextResponse.json({ message: 'Missing required fields: name, capacity, ownerId, licenseNumber, and type' }, { status: 400 });
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       type, // 'standard', 'luxury', 'speed'
       isValidated: false,
       captainId: null, // Captain is not assigned on creation
-      routeIds: [], // Boats start with no assigned routes
+      routeIds: routeIds && Array.isArray(routeIds) ? routeIds.map(id => new ObjectId(id)) : [], // Assign initial routes
       createdAt: new Date(),
     };
 
