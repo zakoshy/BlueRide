@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, Minus, Plus, CheckSquare, Send, ChevronsRight, DollarSign, TrendingUp, Settings2, BarChart3, Lightbulb, Banknote, UserCheck } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, User, Sailboat, CheckSquare, Send, DollarSign, TrendingUp, Settings2, BarChart3, Banknote, UserCheck, Route as RouteIcon, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,12 +17,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Combobox } from "@/components/ui/combobox";
 import type { User as FirebaseUser } from "firebase/auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 interface Boat {
@@ -112,6 +114,11 @@ export default function DashboardPage() {
   const [routeToAdjust, setRouteToAdjust] = useState<Route | null>(null);
   const [singleFareAdjustmentPercent, setSingleFareAdjustmentPercent] = useState([0]);
   
+  // State for managing boat routes
+  const [isManageRoutesOpen, setManageRoutesOpen] = useState(false);
+  const [boatToManageRoutes, setBoatToManageRoutes] = useState<Boat | null>(null);
+  const [assignedRoutes, setAssignedRoutes] = useState<string[]>([]);
+  
   // ERP State
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [crewPayouts, setCrewPayouts] = useState<CrewPayout[]>([]);
@@ -166,7 +173,7 @@ export default function DashboardPage() {
     }
     if (!user || !profile) {
       if (!authLoading) {
-        window.location.href = '/login';
+        router.push('/login');
       }
       return;
     }
@@ -175,9 +182,9 @@ export default function DashboardPage() {
       setIsOwner(true);
       fetchOwnerData(user);
     } else {
-        window.location.href = '/profile';
+        router.push('/profile');
     }
-  }, [user, profile, authLoading, fetchOwnerData]);
+  }, [user, profile, authLoading, router, fetchOwnerData]);
 
 
   const handleAddBoat = async (e: React.FormEvent) => {
@@ -190,7 +197,7 @@ export default function DashboardPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: newBoatName,
-                capacity: parseInt(newBoatCapacity, 10),
+                capacity: newBoatCapacity,
                 description: newBoatDescription,
                 licenseNumber: newBoatLicense,
                 ownerId: user.uid,
@@ -345,6 +352,53 @@ export default function DashboardPage() {
         setRouteToAdjust(null);
     };
 
+    const handleOpenManageRoutes = async (boat: Boat) => {
+        setBoatToManageRoutes(boat);
+        setAssignedRoutes([]); // Clear previous state
+        try {
+            const response = await fetch(`/api/boats/routes?boatId=${boat._id}`);
+            if (response.ok) {
+                const currentRoutes: Route[] = await response.json();
+                setAssignedRoutes(currentRoutes.map(r => r._id));
+            } else {
+                toast({ title: "Error", description: "Failed to fetch current routes for this boat.", variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "An unexpected error occurred while fetching boat routes.", variant: "destructive" });
+        }
+        setManageRoutesOpen(true);
+    };
+
+    const handleRouteAssignmentChange = (routeId: string, isChecked: boolean) => {
+        setAssignedRoutes(prev => {
+            if (isChecked) {
+                return [...prev, routeId];
+            } else {
+                return prev.filter(id => id !== routeId);
+            }
+        });
+    };
+
+    const handleSaveRoutesForBoat = async () => {
+        if (!boatToManageRoutes) return;
+        try {
+            const response = await fetch('/api/boats/routes', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ boatId: boatToManageRoutes._id, routeIds: assignedRoutes }),
+            });
+            if (response.ok) {
+                toast({ title: "Success", description: "Boat routes updated successfully." });
+                setManageRoutesOpen(false);
+                setBoatToManageRoutes(null);
+            } else {
+                 const errorData = await response.json();
+                 toast({ title: "Save Failed", description: errorData.message || "Could not save routes.", variant: "destructive" });
+            }
+        } catch (error) {
+             toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+        }
+    };
 
 
   if (authLoading || loading) {
@@ -415,11 +469,11 @@ export default function DashboardPage() {
             <p className="text-muted-foreground">Manage your boats, bookings, and route pricing below.</p>
         </div>
 
-        <Tabs defaultValue="fares">
+        <Tabs defaultValue="boats">
             <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="boats">My Fleet</TabsTrigger>
                 <TabsTrigger value="fares">Route Fares</TabsTrigger>
                 <TabsTrigger value="bookings">Booking History</TabsTrigger>
-                <TabsTrigger value="boats">My Fleet</TabsTrigger>
                 <TabsTrigger value="erp">My ERP</TabsTrigger>
             </TabsList>
 
@@ -463,9 +517,9 @@ export default function DashboardPage() {
                                             <span>+15%</span>
                                         </div>
                                     </div>
-                                    <CardFooter>
+                                    <DialogFooter>
                                         <Button className="w-full" onClick={handleApplyPercentageChange}>Apply Adjustment</Button>
-                                    </CardFooter>
+                                    </DialogFooter>
                                 </DialogContent>
                             </Dialog>
                              <Button onClick={handleUpdateAllFares} disabled={Object.keys(fareChanges).length === 0} className="w-full sm:w-auto">
@@ -581,7 +635,7 @@ export default function DashboardPage() {
                     <CardHeader className="flex flex-row items-center justify-between">
                         <div>
                            <CardTitle className="flex items-center gap-2"><Ship/>Your Fleet</CardTitle>
-                           <CardDescription>A list of your currently registered boats. Assign captains here.</CardDescription>
+                           <CardDescription>A list of your registered boats. Assign captains and manage routes here.</CardDescription>
                         </div>
                         <Dialog open={isAddBoatDialogOpen} onOpenChange={setAddBoatDialogOpen}>
                             <DialogTrigger asChild>
@@ -626,9 +680,9 @@ export default function DashboardPage() {
                                         <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} className="col-span-3" required/>
                                     </div>
                                 </div>
-                                <CardFooter>
+                                <DialogFooter>
                                     <Button type="submit" className="w-full">Save Boat</Button>
-                                </CardFooter>
+                                </DialogFooter>
                                 </form>
                             </DialogContent>
                         </Dialog>
@@ -636,8 +690,12 @@ export default function DashboardPage() {
                     <CardContent className="space-y-4">
                          {boats.length > 0 ? boats.map(boat => (
                             <Card key={boat._id} className="p-4 flex flex-col sm:flex-row justify-between items-start gap-4">
-                                <div className="flex-grow">
-                                    <div className="font-semibold flex items-center gap-2">{boat.name} <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge> <Badge variant="outline" className="capitalize">{boat.type}</Badge></div>
+                                <div>
+                                    <div className="font-semibold flex items-center gap-2 flex-wrap">
+                                        {boat.name} 
+                                        <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge> 
+                                        <Badge variant="outline" className="capitalize">{boat.type}</Badge>
+                                    </div>
                                     <p className="text-sm text-muted-foreground">Capacity: {boat.capacity} riders | License: {boat.licenseNumber}</p>
                                     <div className="mt-2 text-sm">
                                         <span className="font-medium">Captain:</span> {
@@ -645,16 +703,22 @@ export default function DashboardPage() {
                                         }
                                     </div>
                                 </div>
-                                <div className="w-full sm:w-64">
-                                  <Label className="text-xs text-muted-foreground">Assign Captain</Label>
-                                  <Combobox
-                                    options={captainOptions}
-                                    selectedValue={boat.captainId || ''}
-                                    onSelect={(captainId) => handleAssignCaptain(boat._id, captainId)}
-                                    placeholder="Select a captain..."
-                                    searchPlaceholder="Search captains..."
-                                    notFoundText="No captains found."
-                                  />
+                                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto items-stretch">
+                                    <div className="w-full sm:w-64">
+                                      <Label className="text-xs text-muted-foreground">Assign Captain</Label>
+                                      <Combobox
+                                        options={captainOptions}
+                                        selectedValue={boat.captainId || ''}
+                                        onSelect={(captainId) => handleAssignCaptain(boat._id, captainId)}
+                                        placeholder="Select a captain..."
+                                        searchPlaceholder="Search captains..."
+                                        notFoundText="No captains found."
+                                      />
+                                    </div>
+                                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleOpenManageRoutes(boat)}>
+                                        <RouteIcon className="mr-2 h-4 w-4"/>
+                                        Manage Routes
+                                    </Button>
                                 </div>
                             </Card>
                         )) : (
@@ -773,9 +837,42 @@ export default function DashboardPage() {
                         <span>+15%</span>
                     </div>
                 </div>
-                <CardFooter>
+                <DialogFooter>
                     <Button className="w-full" onClick={handleApplySinglePercentageChange}>Update Staged Fare</Button>
-                </CardFooter>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        
+        {/* Manage Routes Dialog */}
+        <Dialog open={isManageRoutesOpen} onOpenChange={setManageRoutesOpen}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Manage Routes for {boatToManageRoutes?.name}</DialogTitle>
+                    <DialogDescription>
+                        Select the routes this boat will service.
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh] my-4">
+                    <div className="p-1 space-y-2">
+                        {routes.map(route => (
+                            <div key={route._id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50">
+                                <Checkbox
+                                    id={`route-${route._id}`}
+                                    checked={assignedRoutes.includes(route._id)}
+                                    onCheckedChange={(checked) => handleRouteAssignmentChange(route._id, !!checked)}
+                                />
+                                <Label htmlFor={`route-${route._id}`} className="flex-1 cursor-pointer">
+                                    <span className="font-semibold">{route.from}</span> to <span className="font-semibold">{route.to}</span>
+                                    <span className="text-xs text-muted-foreground ml-2">(Ksh {route.fare_per_person_kes})</span>
+                                </Label>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+                <DialogFooter>
+                     <Button variant="outline" onClick={() => setManageRoutesOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSaveRoutesForBoat}>Save Routes</Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     </div>

@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const ownerId = searchParams.get('ownerId');
     const isValidated = searchParams.get('validated');
+    const routeId = searchParams.get('routeId');
 
     let query: any = {};
 
@@ -21,6 +22,13 @@ export async function GET(request: Request) {
     
     if (isValidated) {
         query.isValidated = true;
+    }
+
+    if (routeId) {
+        if (!ObjectId.isValid(routeId)) {
+            return NextResponse.json({ message: 'Invalid routeId provided' }, { status: 400 });
+        }
+        query.routeIds = new ObjectId(routeId);
     }
 
     const client = await clientPromise;
@@ -58,13 +66,14 @@ export async function POST(request: Request) {
 
     const newBoat = {
       name,
-      capacity,
+      capacity: parseInt(capacity, 10),
       description,
       ownerId,
       licenseNumber,
       type, // 'standard', 'luxury', 'speed'
       isValidated: false,
       captainId: null, // Captain is not assigned on creation
+      routeIds: [], // Boats start with no assigned routes
       createdAt: new Date(),
     };
 

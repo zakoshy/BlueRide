@@ -4,9 +4,9 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare, Route as RouteIcon } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -44,6 +44,13 @@ interface Boat {
     ownerId: string;
 }
 
+interface Route {
+    _id: string;
+    from: string;
+    to: string;
+    fare_per_person_kes: number;
+}
+
 interface FareProposal {
     _id: string;
     routeId: string;
@@ -74,6 +81,7 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
+  const [boatRoutes, setBoatRoutes] = useState<Record<string, Route[]>>({});
   const [fareProposals, setFareProposals] = useState<FareProposal[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   
@@ -150,16 +158,27 @@ export default function AdminPage() {
         try {
             const response = await fetch(`/api/boats?ownerId=${ownerId}`);
             if (response.ok) {
-                const data = await response.json();
+                const data: Boat[] = await response.json();
                 setBoats(data);
+                // Fetch routes for each boat
+                const routesData: Record<string, Route[]> = {};
+                for (const boat of data) {
+                    const routesRes = await fetch(`/api/boats/routes?boatId=${boat._id}`);
+                    if (routesRes.ok) {
+                        routesData[boat._id] = await routesRes.json();
+                    }
+                }
+                setBoatRoutes(routesData);
             } else {
                 toast({ title: "Error", description: "Failed to fetch boats for this owner.", variant: "destructive" });
                 setBoats([]);
+                setBoatRoutes({});
             }
         } catch (error) {
             console.error("Failed to fetch boats", error);
             toast({ title: "Error", description: "An unexpected error occurred while fetching boats.", variant: "destructive" });
             setBoats([]);
+            setBoatRoutes({});
         }
     }, [toast]);
 
@@ -182,7 +201,8 @@ export default function AdminPage() {
                 capacity: parseInt(newBoatCapacity, 10),
                 description: newBoatDescription,
                 licenseNumber: newBoatLicense,
-                ownerId: selectedOwner.uid
+                ownerId: selectedOwner.uid,
+                type: 'standard' // Or make this selectable
             }),
         });
 
@@ -644,7 +664,7 @@ export default function AdminPage() {
       
       {/* Manage Boats Dialog */}
        <Dialog open={isManageBoatsDialogOpen} onOpenChange={setManageBoatsDialogOpen}>
-            <DialogContent className="sm:max-w-[825px]">
+            <DialogContent className="sm:max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Manage Boats for {selectedOwner?.name}</DialogTitle>
                     <DialogDescription>
@@ -698,6 +718,7 @@ export default function AdminPage() {
                                     <TableHead>Name</TableHead>
                                     <TableHead>Capacity</TableHead>
                                     <TableHead>License #</TableHead>
+                                    <TableHead>Assigned Routes</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
@@ -708,6 +729,12 @@ export default function AdminPage() {
                                     <TableCell className="font-medium">{boat.name}</TableCell>
                                     <TableCell>{boat.capacity}</TableCell>
                                     <TableCell className="font-mono text-xs">{boat.licenseNumber}</TableCell>
+                                     <TableCell>
+                                        <div className="flex items-center gap-1 text-muted-foreground">
+                                           <RouteIcon className="h-4 w-4" />
+                                           <span>{(boatRoutes[boat._id] || []).length} route(s)</span>
+                                        </div>
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant={boat.isValidated ? 'default' : 'destructive'} className={boat.isValidated ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                                             {boat.isValidated ? 
@@ -740,5 +767,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

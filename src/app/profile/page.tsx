@@ -211,16 +211,17 @@ export default function ProfilePage() {
     setIsFinding(true);
     setBoats([]);
     try {
-      // 1. Get the fare for the selected route
+      // 1. Get the fare and routeId for the selected route
       const fareResponse = await fetch(`/api/fare?pickup=${pickup}&destination=${destination}`);
       if (!fareResponse.ok) {
         throw new Error("This route is not available. Please select another.");
       }
       const fareData = await fareResponse.json();
       setBaseFare(fareData.fare);
+      const routeId = fareData.routeId;
 
-      // 2. Fetch all validated boats (a real app would filter by route/availability)
-      const boatsResponse = await fetch(`/api/boats?validated=true`);
+      // 2. Fetch all validated boats that are assigned to this route
+      const boatsResponse = await fetch(`/api/boats?validated=true&routeId=${routeId}`);
       if (boatsResponse.ok) {
         const boatsData = await boatsResponse.json();
         setBoats(boatsData);

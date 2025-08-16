@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ 
-        fare: route.fare_per_person_kes
+        fare: route.fare_per_person_kes,
+        routeId: route._id // Return the routeId for filtering boats
     }, { status: 200 });
 
   } catch (error) {
