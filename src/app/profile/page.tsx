@@ -75,13 +75,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const handlePrint = useReactToPrint({
-    content: () => receiptRef.current,
-    documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
-    onAfterPrint: () => toast({ title: "Print Complete", description: "Your receipt has been sent to the printer."}),
-    onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
-  });
-
   const [pickupOptions, setPickupOptions] = useState<ComboboxOption[]>([]);
   const [destinationOptions, setDestinationOptions] = useState<ComboboxOption[]>([]);
   
@@ -116,7 +109,6 @@ export default function ProfilePage() {
   
   // Receipt State
   const [receiptData, setReceiptData] = useState<Booking | null>(null);
-  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const receiptRef = useRef<HTMLDivElement>(null);
   
@@ -132,6 +124,13 @@ export default function ProfilePage() {
   const [refundBooking, setRefundBooking] = useState<Booking | null>(null);
   const [refundReason, setRefundReason] = useState("");
 
+  const handlePrint = useReactToPrint({
+    content: () => receiptRef.current,
+    documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
+    onAfterPrint: () => toast({ title: "Print Complete", description: "Your receipt has been sent to the printer."}),
+    onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
+  });
+  
   const calculatedLuggageFee = useMemo(() => {
     return hasLuggage && luggageWeight >= LUGGAGE_WEIGHT_THRESHOLD ? LUGGAGE_FEE : 0;
   }, [hasLuggage, luggageWeight]);
@@ -563,7 +562,7 @@ export default function ProfilePage() {
                     <div className="space-y-6 mt-8">
                          <h2 className="text-2xl font-bold">
                             {activeService === 'trip' 
-                                ? <>Available Boats for: <span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></>
+                                ? <><>Available Boats for: </> <span className="text-primary">{pickup}</span> <>to </> <span className="text-primary">{destination}</span></>
                                 : "Available Private Charters"
                             }
                         </h2>
@@ -622,8 +621,8 @@ export default function ProfilePage() {
                                             <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
                                             <p className="text-sm text-muted-foreground">
                                                  {booking.bookingType === 'charter' 
-                                                    ? `Private Charter (${booking.destination})`
-                                                    : `From ${booking.pickup} to ${booking.destination}`
+                                                    ? <>Private Charter ({booking.destination})</>
+                                                    : <>From {booking.pickup} to {booking.destination}</>
                                                 }
                                             </p>
                                             <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
@@ -779,7 +778,7 @@ export default function ProfilePage() {
                         <div className="flex justify-between items-center font-semibold text-lg">
                             <span>Total Fare:</span>
                             <span>
-                                {calculatedFare > 0 ? `Ksh ${calculatedFare.toLocaleString()}` : <Skeleton className="h-6 w-20 inline-block"/>}
+                                {calculatedFare > 0 ? <>Ksh {calculatedFare.toLocaleString()}</> : <Skeleton className="h-6 w-20 inline-block"/>}
                             </span>
                         </div>
                          {bookingType === 'whole_boat' && selectedBoat && <p className="text-xs text-muted-foreground text-center">Booking the whole boat covers all {selectedBoat.capacity} seats.</p>}
@@ -884,9 +883,9 @@ export default function ProfilePage() {
                              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                                 <p><strong className="font-medium text-muted-foreground">Booking Type:</strong></p>
                                 <p className="text-right">{
-                                    receiptData?.bookingType === 'seat' ? `Seat(s): ${receiptData.seats}` 
+                                    receiptData?.bookingType === 'seat' ? <>Seat(s): {receiptData.seats}</> 
                                     : receiptData?.bookingType === 'whole_boat' ? 'Whole Boat'
-                                    : `Charter (${receiptData?.duration}hr)`
+                                    : <>Charter ({receiptData?.duration}hr)</>
                                 }</p>
                                 
                                 <p><strong className="font-medium text-muted-foreground">Status:</strong></p>
@@ -1018,3 +1017,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
