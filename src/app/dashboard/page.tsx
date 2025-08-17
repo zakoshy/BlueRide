@@ -103,7 +103,6 @@ export default function DashboardPage() {
   const [isAddBoatDialogOpen, setAddBoatDialogOpen] = useState(false);
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
-  const [newBoatDescription, setNewBoatDescription] = useState('');
   const [newBoatLicense, setNewBoatLicense] = useState('');
   const [newBoatType, setNewBoatType] = useState<'standard' | 'luxury' | 'speed'>('standard');
   const [newBoatRoutes, setNewBoatRoutes] = useState<string[]>([]);
@@ -211,7 +210,7 @@ export default function DashboardPage() {
             body: JSON.stringify({
                 name: newBoatName,
                 capacity: newBoatCapacity,
-                description: newBoatDescription,
+                description: '', // Description removed
                 licenseNumber: newBoatLicense,
                 ownerId: user.uid,
                 type: newBoatType,
@@ -223,7 +222,6 @@ export default function DashboardPage() {
             toast({ title: "Success", description: "New boat added successfully. It is pending validation from an admin." });
             setNewBoatName('');
             setNewBoatCapacity('');
-            setNewBoatDescription('');
             setNewBoatLicense('');
             setNewBoatRoutes([]);
             setRouteSearch('');
@@ -772,10 +770,6 @@ export default function DashboardPage() {
                                             </Select>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description">Description</Label>
-                                        <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} required/>
-                                    </div>
                                     {newBoatType === 'standard' && (
                                     <div className="space-y-2">
                                         <Label>Assign Routes</Label>
@@ -819,7 +813,7 @@ export default function DashboardPage() {
                                     <div className="font-semibold flex items-center gap-2 flex-wrap">
                                         {boat.name} 
                                         <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge> 
-                                        <Badge variant="outline" className="capitalize">{boat.type}</Badge>
+                                        <Badge variant="outline" className="capitalize">{boat.type || 'standard'}</Badge>
                                     </div>
                                     <p className="text-sm text-muted-foreground">Capacity: {boat.capacity} riders | License: {boat.licenseNumber}</p>
                                     <div className="mt-2 text-sm">
@@ -840,7 +834,7 @@ export default function DashboardPage() {
                                         notFoundText="No captains found."
                                       />
                                     </div>
-                                     {boat.type === 'standard' && (
+                                     {(boat.type === 'standard' || !boat.type) && (
                                         <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleOpenManageRoutes(boat)}>
                                             <RouteIcon className="mr-2 h-4 w-4"/>
                                             Manage Routes
