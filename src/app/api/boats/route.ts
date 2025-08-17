@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const isValidated = searchParams.get('validated');
     const routeId = searchParams.get('routeId');
     const type = searchParams.get('type');
+    const county = searchParams.get('county');
 
     let query: any = {};
 
@@ -31,6 +32,10 @@ export async function GET(request: Request) {
         } else {
             query.type = type;
         }
+    }
+    
+    if (county) {
+        query.homeCounty = county;
     }
 
     if (routeId) {
@@ -56,10 +61,14 @@ export async function GET(request: Request) {
 // POST a new boat
 export async function POST(request: Request) {
   try {
-    const { name, capacity, description, ownerId, licenseNumber, type, routeIds } = await request.json();
+    const { name, capacity, description, ownerId, licenseNumber, type, routeIds, homeCounty } = await request.json();
 
     if (!name || !capacity || !ownerId || !licenseNumber || !type) {
       return NextResponse.json({ message: 'Missing required fields: name, capacity, ownerId, licenseNumber, and type' }, { status: 400 });
+    }
+
+    if ((type === 'luxury' || type === 'speed') && !homeCounty) {
+        return NextResponse.json({ message: 'Home county is required for luxury and speed boats' }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -73,7 +82,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Invalid owner or user is not a boat owner' }, { status: 403 });
     }
 
-    const newBoat = {
+    const newBoat: any = {
       name,
       capacity: parseInt(capacity, 10),
       description,
@@ -82,9 +91,15 @@ export async function POST(request: Request) {
       type, // 'standard', 'luxury', 'speed'
       isValidated: false,
       captainId: null, // Captain is not assigned on creation
-      routeIds: type === 'standard' && Array.isArray(routeIds) ? routeIds.map(id => new ObjectId(id)) : [], // Assign initial routes only for standard boats
       createdAt: new Date(),
     };
+    
+    if (type === 'standard') {
+        newBoat.routeIds = Array.isArray(routeIds) ? routeIds.map(id => new ObjectId(id)) : [];
+    } else {
+        newBoat.homeCounty = homeCounty;
+    }
+
 
     const result = await boatsCollection.insertOne(newBoat);
 
@@ -127,5 +142,3 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
   }
-
-    

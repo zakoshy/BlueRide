@@ -8,8 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, Sailboat, CheckSquare, Send, DollarSign, TrendingUp, Settings2, BarChart3, Banknote, UserCheck, Route as RouteIcon, Trash2, BrainCircuit, ChevronDown } from "lucide-react";
+import { ArrowLeft, PlusCircle, Ship, BookOpen, AlertCircle, Sailboat, CheckSquare, Send, DollarSign, TrendingUp, Settings2, BarChart3, Banknote, UserCheck, Route as RouteIcon, Trash2, BrainCircuit, ChevronDown, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,12 +31,12 @@ interface Boat {
     _id: string;
     name: string;
     capacity: number;
-    description: string;
     licenseNumber: string;
     isValidated: boolean;
     ownerId: string;
     captainId?: string;
     type: 'standard' | 'luxury' | 'speed';
+    homeCounty?: string;
 }
 
 interface Booking {
@@ -85,6 +84,13 @@ interface CrewPayout {
     tripCount: number;
 }
 
+const counties = [
+    { value: 'Mombasa', label: 'Mombasa' },
+    { value: 'Kwale', label: 'Kwale' },
+    { value: 'Kilifi', label: 'Kilifi' },
+    { value: 'Lamu', label: 'Lamu' },
+];
+
 
 export default function DashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -106,6 +112,7 @@ export default function DashboardPage() {
   const [newBoatLicense, setNewBoatLicense] = useState('');
   const [newBoatType, setNewBoatType] = useState<'standard' | 'luxury' | 'speed'>('standard');
   const [newBoatRoutes, setNewBoatRoutes] = useState<string[]>([]);
+  const [newBoatHomeCounty, setNewBoatHomeCounty] = useState<string>("");
   
   const [isAdjustFareDialogOpen, setAdjustFareDialogOpen] = useState(false);
   const [fareAdjustmentPercent, setFareAdjustmentPercent] = useState([0]);
@@ -203,19 +210,29 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!user) return;
 
+    const requestBody: any = {
+        name: newBoatName,
+        capacity: newBoatCapacity,
+        licenseNumber: newBoatLicense,
+        ownerId: user.uid,
+        type: newBoatType,
+    };
+
+    if (newBoatType === 'standard') {
+        requestBody.routeIds = newBoatRoutes;
+    } else {
+        if (!newBoatHomeCounty) {
+             toast({ title: "Validation Error", description: "Please select a home county for Luxury or Speed boats.", variant: "destructive" });
+             return;
+        }
+        requestBody.homeCounty = newBoatHomeCounty;
+    }
+
     try {
         const response = await fetch('/api/boats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: newBoatName,
-                capacity: newBoatCapacity,
-                description: '', // Description removed
-                licenseNumber: newBoatLicense,
-                ownerId: user.uid,
-                type: newBoatType,
-                routeIds: newBoatType === 'standard' ? newBoatRoutes : [],
-            }),
+            body: JSON.stringify(requestBody),
         });
 
         if (response.ok) {
@@ -225,6 +242,7 @@ export default function DashboardPage() {
             setNewBoatLicense('');
             setNewBoatRoutes([]);
             setRouteSearch('');
+            setNewBoatHomeCounty("");
             setAddBoatDialogOpen(false);
             fetchOwnerData(user); // Refresh the list
         } else {
@@ -770,6 +788,23 @@ export default function DashboardPage() {
                                             </Select>
                                         </div>
                                     </div>
+
+                                    {(newBoatType === 'luxury' || newBoatType === 'speed') && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="home-county">Home County</Label>
+                                             <Select onValueChange={setNewBoatHomeCounty} value={newBoatHomeCounty}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select home county" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {counties.map(county => (
+                                                        <SelectItem key={county.value} value={county.value}>{county.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+
                                     {newBoatType === 'standard' && (
                                     <div className="space-y-2">
                                         <Label>Assign Routes</Label>
@@ -813,7 +848,12 @@ export default function DashboardPage() {
                                     <div className="font-semibold flex items-center gap-2 flex-wrap">
                                         {boat.name} 
                                         <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge> 
-                                        <Badge variant="outline" className="capitalize">{boat.type || 'standard'}</Badge>
+                                        <Badge variant="outline" className="capitalize">
+                                            <div className="flex items-center gap-1">
+                                            {boat.type}
+                                            {boat.homeCounty && <span className="text-muted-foreground text-xs flex items-center gap-1">(<MapPin size={12}/>{boat.homeCounty})</span>}
+                                            </div>
+                                        </Badge>
                                     </div>
                                     <p className="text-sm text-muted-foreground">Capacity: {boat.capacity} riders | License: {boat.licenseNumber}</p>
                                     <div className="mt-2 text-sm">
@@ -1010,5 +1050,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

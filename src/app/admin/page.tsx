@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare, Route as RouteIcon } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare, Route as RouteIcon, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -46,6 +46,7 @@ interface Boat {
     isValidated: boolean;
     ownerId: string;
     type: 'standard' | 'luxury' | 'speed';
+    homeCounty?: string;
 }
 
 interface Route {
@@ -75,6 +76,13 @@ interface Review {
     boat: { name: string };
     owner: { name: string };
 }
+
+const counties = [
+    { value: 'Mombasa', label: 'Mombasa' },
+    { value: 'Kwale', label: 'Kwale' },
+    { value: 'Kilifi', label: 'Kilifi' },
+    { value: 'Lamu', label: 'Lamu' },
+];
 
 export default function AdminPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -106,6 +114,7 @@ export default function AdminPage() {
   const [newBoatLicense, setNewBoatLicense] = useState('');
   const [newBoatType, setNewBoatType] = useState<'standard' | 'luxury' | 'speed'>('standard');
   const [newBoatRoutes, setNewBoatRoutes] = useState<string[]>([]);
+  const [newBoatHomeCounty, setNewBoatHomeCounty] = useState<string>("");
   const [routeSearch, setRouteSearch] = useState("");
 
 
@@ -177,9 +186,11 @@ export default function AdminPage() {
                 // Fetch routes for each boat
                 const routesData: Record<string, Route[]> = {};
                 for (const boat of data) {
-                    const routesRes = await fetch(`/api/boats/routes?boatId=${boat._id}`);
-                    if (routesRes.ok) {
-                        routesData[boat._id] = await routesRes.json();
+                    if (boat.type === 'standard') {
+                        const routesRes = await fetch(`/api/boats/routes?boatId=${boat._id}`);
+                        if (routesRes.ok) {
+                            routesData[boat._id] = await routesRes.json();
+                        }
                     }
                 }
                 setBoatRoutes(routesData);
@@ -206,19 +217,30 @@ export default function AdminPage() {
     e.preventDefault();
     if (!selectedOwner) return;
 
+    const requestBody: any = {
+        name: newBoatName,
+        capacity: parseInt(newBoatCapacity, 10),
+        description: newBoatDescription,
+        licenseNumber: newBoatLicense,
+        ownerId: selectedOwner.uid,
+        type: newBoatType,
+    };
+
+    if (newBoatType === 'standard') {
+        requestBody.routeIds = newBoatRoutes;
+    } else {
+        if (!newBoatHomeCounty) {
+             toast({ title: "Validation Error", description: "Please select a home county for Luxury or Speed boats.", variant: "destructive" });
+             return;
+        }
+        requestBody.homeCounty = newBoatHomeCounty;
+    }
+
     try {
         const response = await fetch('/api/boats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: newBoatName,
-                capacity: parseInt(newBoatCapacity, 10),
-                description: newBoatDescription,
-                licenseNumber: newBoatLicense,
-                ownerId: selectedOwner.uid,
-                type: newBoatType,
-                routeIds: newBoatType === 'standard' ? newBoatRoutes : []
-            }),
+            body: JSON.stringify(requestBody),
         });
 
         if (response.ok) {
@@ -229,6 +251,7 @@ export default function AdminPage() {
             setNewBoatLicense('');
             setNewBoatRoutes([]);
             setNewBoatType('standard');
+            setNewBoatHomeCounty('');
             setAddBoatDialogOpen(false);
             fetchBoatsForOwner(selectedOwner.uid); // Refresh the list
         } else {
@@ -754,6 +777,22 @@ export default function AdminPage() {
                                         <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} required/>
                                     </div>
 
+                                    {(newBoatType === 'luxury' || newBoatType === 'speed') && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="home-county">Home County</Label>
+                                             <Select onValueChange={setNewBoatHomeCounty} value={newBoatHomeCounty}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select home county" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {counties.map(county => (
+                                                        <SelectItem key={county.value} value={county.value}>{county.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+
                                     {newBoatType === 'standard' && (
                                         <div className="space-y-2">
                                             <Label>Assign Routes</Label>
@@ -795,7 +834,7 @@ export default function AdminPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Name</TableHead>
-                                    <TableHead>Type</TableHead>
+                                    <TableHead>Type / Location</TableHead>
                                     <TableHead>Assigned Routes</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
@@ -805,11 +844,18 @@ export default function AdminPage() {
                                 {boats.map((boat) => (
                                 <TableRow key={boat._id}>
                                     <TableCell className="font-medium">{boat.name}</TableCell>
-                                    <TableCell className="capitalize">{boat.type}</TableCell>
+                                    <TableCell className="capitalize">
+                                        <div className="flex items-center gap-1">
+                                            {boat.type}
+                                            {boat.homeCounty && <span className="text-muted-foreground text-xs flex items-center gap-1">(<MapPin size={12}/>{boat.homeCounty})</span>}
+                                        </div>
+                                    </TableCell>
                                      <TableCell>
                                         <div className="flex items-center gap-1 text-muted-foreground">
-                                           <RouteIcon className="h-4 w-4" />
-                                           <span>{(boatRoutes[boat._id] || []).length} route(s)</span>
+                                           {boat.type === 'standard' ?
+                                             <><RouteIcon className="h-4 w-4" /><span>{(boatRoutes[boat._id] || []).length} route(s)</span></>
+                                            : <span className="text-xs italic">N/A (Charter)</span>
+                                           }
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -844,5 +890,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

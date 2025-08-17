@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star, Rocket, Gem, HelpCircle, Briefcase, Weight } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star, Rocket, Gem, HelpCircle, Briefcase, Weight, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +42,7 @@ interface Boat {
   isValidated: boolean;
   type: 'standard' | 'luxury' | 'speed';
   description: string;
+  homeCounty?: string;
 }
 
 interface Booking {
@@ -69,6 +70,12 @@ type ServiceType = 'trip' | 'charter';
 const LUGGAGE_FEE = 250;
 const LUGGAGE_WEIGHT_THRESHOLD = 15;
 
+const counties = [
+    { value: 'Mombasa', label: 'Mombasa' },
+    { value: 'Kwale', label: 'Kwale' },
+    { value: 'Kilifi', label: 'Kilifi' },
+    { value: 'Lamu', label: 'Lamu' },
+];
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
@@ -95,6 +102,7 @@ export default function ProfilePage() {
 
   // Charter booking state
   const [charterDuration, setCharterDuration] = useState(1);
+  const [charterCounty, setCharterCounty] = useState<string>("");
   const HOURLY_RATE_LUXURY = 15000;
   const HOURLY_RATE_SPEED = 10000;
 
@@ -189,7 +197,12 @@ export default function ProfilePage() {
              return;
         }
     } else { // Charter service
-        apiUrl += `&type=luxury,speed`;
+        if (!charterCounty) {
+          toast({ title: "Missing Information", description: "Please select a county for your charter.", variant: "destructive" });
+          setIsFinding(false);
+          return;
+        }
+        apiUrl += `&type=luxury,speed&county=${charterCounty}`;
     }
 
     try {
@@ -198,7 +211,7 @@ export default function ProfilePage() {
         const boatsData = await boatsResponse.json();
         setBoats(boatsData);
         if (boatsData.length === 0) {
-           toast({ title: "No Boats Found", description: `There are currently no ${activeService === 'trip' ? 'boats' : 'charters'} available. Please check back later.`, variant: "default" });
+           toast({ title: "No Boats Found", description: `There are currently no ${activeService === 'trip' ? 'boats' : 'charters'} available for your selection. Please check back later.`, variant: "default" });
         }
       } else {
         toast({ title: "Error", description: "Could not fetch available boats.", variant: "destructive" });
@@ -208,7 +221,7 @@ export default function ProfilePage() {
     } finally {
       setIsFinding(false);
     }
-  }, [pickup, destination, toast, activeService]);
+  }, [pickup, destination, toast, activeService, charterCounty]);
   
   useEffect(() => {
     if (!loading && !user) {
@@ -328,7 +341,7 @@ export default function ProfilePage() {
             boatId: selectedBoat._id,
             riderId: user.uid,
             pickup: "Private Charter", // Or some other signifier
-            destination: `${charterDuration} hour(s)`,
+            destination: `${charterDuration} hour(s) in ${charterCounty}`,
             bookingType: 'charter',
             duration: charterDuration,
             baseFare: finalFare,
@@ -363,6 +376,7 @@ export default function ProfilePage() {
             setBoats([]);
             setPickup("");
             setDestination("");
+            setCharterCounty("");
             fetchUserBookings(); // Refresh booking history
         } else {
             const errorData = await response.json();
@@ -539,9 +553,21 @@ export default function ProfilePage() {
                                 </Button>
                           </TabsContent>
                           <TabsContent value="charter" className="mt-4">
-                            <CardDescription className="mb-4">Browse and hire our exclusive fleet of luxury and speed boats by the hour for a private tour.</CardDescription>
-                                <p className="text-sm text-muted-foreground">Click the button below to see all available private charters.</p>
-                                 <Button onClick={handleFindBoats} disabled={isFinding} className="mt-4">
+                            <CardDescription className="mb-4">Hire our exclusive fleet of luxury and speed boats by the hour. First, select your county.</CardDescription>
+                                <div className="grid gap-4 md:grid-cols-2 md:gap-8">
+                                    <div className="grid w-full gap-1.5">
+                                        <Label htmlFor="county">Select County</Label>
+                                        <Select onValueChange={setCharterCounty} value={charterCounty}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a county" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {counties.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                 <Button onClick={handleFindBoats} disabled={isFinding || !charterCounty} className="mt-4">
                                     {isFinding ? "Searching..." : "Find a Charter Boat"}
                                 </Button>
                           </TabsContent>
@@ -564,7 +590,7 @@ export default function ProfilePage() {
                          <h2 className="text-2xl font-bold">
                             {activeService === 'trip' 
                                 ? <><>Available Boats for: </> <span className="text-primary">{pickup}</span> <>to </> <span className="text-primary">{destination}</span></>
-                                : "Available Private Charters"
+                                : <>Available Charters in <span className="text-primary">{charterCounty}</span></>
                             }
                         </h2>
                         <div className="grid gap-6 md:grid-cols-2">
@@ -582,6 +608,7 @@ export default function ProfilePage() {
                                     <CardContent className="flex-grow">
                                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                             <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
+                                            {boat.homeCounty && <div className="flex items-center gap-1"><MapPin/>{boat.homeCounty}</div>}
                                         </div>
                                          <p className="text-lg font-bold mt-2">
                                             {activeService === 'trip'
@@ -753,7 +780,7 @@ export default function ProfilePage() {
                     ) : (
                          <div className="space-y-4 rounded-lg border p-4">
                              <p className="text-sm text-muted-foreground">
-                                You are chartering the <span className="font-semibold text-primary">{selectedBoat?.name}</span>.
+                                You are chartering the <span className="font-semibold text-primary">{selectedBoat?.name}</span> in <span className="font-semibold text-primary">{charterCounty}</span>.
                             </p>
                              <div className="grid gap-2">
                                 <Label htmlFor="duration">Booking Duration (hours)</Label>
@@ -886,7 +913,7 @@ export default function ProfilePage() {
                                 <p className="text-right">{
                                     receiptData?.bookingType === 'seat' ? <>Seat(s): {receiptData.seats}</> 
                                     : receiptData?.bookingType === 'whole_boat' ? 'Whole Boat'
-                                    : <>Charter ({receiptData?.duration}hr)</>
+                                    : <>Charter ({receiptData?.destination})</>
                                 }</p>
                                 
                                 <p><strong className="font-medium text-muted-foreground">Status:</strong></p>
