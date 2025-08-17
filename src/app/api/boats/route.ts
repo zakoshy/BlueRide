@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const ownerId = searchParams.get('ownerId');
     const isValidated = searchParams.get('validated');
     const routeId = searchParams.get('routeId');
+    const type = searchParams.get('type');
 
     let query: any = {};
 
@@ -22,6 +23,14 @@ export async function GET(request: Request) {
     
     if (isValidated) {
         query.isValidated = true;
+    }
+    
+    if (type) {
+        if (type.includes(',')) {
+            query.type = { $in: type.split(',') };
+        } else {
+            query.type = type;
+        }
     }
 
     if (routeId) {
@@ -73,7 +82,7 @@ export async function POST(request: Request) {
       type, // 'standard', 'luxury', 'speed'
       isValidated: false,
       captainId: null, // Captain is not assigned on creation
-      routeIds: routeIds && Array.isArray(routeIds) ? routeIds.map(id => new ObjectId(id)) : [], // Assign initial routes
+      routeIds: type === 'standard' && Array.isArray(routeIds) ? routeIds.map(id => new ObjectId(id)) : [], // Assign initial routes only for standard boats
       createdAt: new Date(),
     };
 
@@ -118,3 +127,5 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
   }
+
+    

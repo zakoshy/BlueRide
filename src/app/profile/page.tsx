@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star, Rocket, Gem } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +40,7 @@ interface Boat {
   ownerId: string;
   isValidated: boolean;
   type: 'standard' | 'luxury' | 'speed';
+  description: string;
 }
 
 interface Booking {
@@ -48,8 +49,9 @@ interface Booking {
   destination: string;
   status: 'pending' | 'confirmed' | 'completed' | 'rejected' | 'cancelled';
   createdAt: string;
-  bookingType: 'seat' | 'whole_boat';
+  bookingType: 'seat' | 'whole_boat' | 'charter';
   seats?: number;
+  duration?: number;
   baseFare: number;
   finalFare?: number;
   hasBeenReviewed?: boolean;
@@ -60,6 +62,7 @@ interface Booking {
 }
 
 type PaymentMethod = 'card' | 'mpesa' | 'paypal';
+type ServiceType = 'trip' | 'charter';
 
 
 export default function ProfilePage() {
@@ -74,13 +77,21 @@ export default function ProfilePage() {
   const [destination, setDestination] = useState<string>("");
   const [boats, setBoats] = useState<Boat[]>([]);
 
-
+  const [activeService, setActiveService] = useState<ServiceType>('trip');
   const [isFinding, setIsFinding] = useState(false);
   const [selectedBoat, setSelectedBoat] = useState<Boat | null>(null);
+  
+  // Trip booking state
   const [bookingType, setBookingType] = useState<'seat' | 'whole_boat'>('seat');
   const [numSeats, setNumSeats] = useState(1);
-  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [baseFare, setBaseFare] = useState(0);
+
+  // Charter booking state
+  const [charterDuration, setCharterDuration] = useState(1);
+  const HOURLY_RATE_LUXURY = 15000;
+  const HOURLY_RATE_SPEED = 10000;
+
+  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState("");
   const [activePaymentMethod, setActivePaymentMethod] = useState<PaymentMethod>('mpesa');
 
@@ -202,31 +213,40 @@ export default function ProfilePage() {
   }, [pickup, toast]);
 
 
-  const handleFindBoat = useCallback(async () => {
-    if (!pickup || !destination) {
-      toast({ title: "Missing Information", description: "Please select both a pickup and destination.", variant: "destructive" });
-      return;
-    }
-
+  const handleFindBoats = useCallback(async () => {
     setIsFinding(true);
     setBoats([]);
-    try {
-      // 1. Get the fare and routeId for the selected route
-      const fareResponse = await fetch(`/api/fare?pickup=${pickup}&destination=${destination}`);
-      if (!fareResponse.ok) {
-        throw new Error("This route is not available. Please select another.");
-      }
-      const fareData = await fareResponse.json();
-      setBaseFare(fareData.fare);
-      const routeId = fareData.routeId;
+    
+    let apiUrl = '/api/boats?validated=true';
 
-      // 2. Fetch all validated boats that are assigned to this route
-      const boatsResponse = await fetch(`/api/boats?validated=true&routeId=${routeId}`);
+    if (activeService === 'trip') {
+        if (!pickup || !destination) {
+          toast({ title: "Missing Information", description: "Please select both a pickup and destination.", variant: "destructive" });
+          setIsFinding(false);
+          return;
+        }
+        try {
+            const fareResponse = await fetch(`/api/fare?pickup=${pickup}&destination=${destination}`);
+            if (!fareResponse.ok) throw new Error("This route is not available. Please select another.");
+            const fareData = await fareResponse.json();
+            setBaseFare(fareData.fare);
+            apiUrl += `&routeId=${fareData.routeId}&type=standard`;
+        } catch (error: any) {
+             toast({ title: "Error", description: error.message || "An unexpected error occurred while fetching route data.", variant: "destructive" });
+             setIsFinding(false);
+             return;
+        }
+    } else { // Charter service
+        apiUrl += `&type=luxury,speed`;
+    }
+
+    try {
+      const boatsResponse = await fetch(apiUrl);
       if (boatsResponse.ok) {
         const boatsData = await boatsResponse.json();
         setBoats(boatsData);
         if (boatsData.length === 0) {
-           toast({ title: "No Boats Found", description: "There are currently no boats available for this route. Please check back later.", variant: "default" });
+           toast({ title: "No Boats Found", description: `There are currently no ${activeService === 'trip' ? 'boats' : 'charters'} available. Please check back later.`, variant: "default" });
         }
       } else {
         toast({ title: "Error", description: "Could not fetch available boats.", variant: "destructive" });
@@ -236,24 +256,39 @@ export default function ProfilePage() {
     } finally {
       setIsFinding(false);
     }
-  }, [pickup, destination, toast]);
+  }, [pickup, destination, toast, activeService]);
 
 
   const handleBookingSubmit = async () => {
-    if (!user || !selectedBoat || !pickup || !destination) {
+    if (!user || !selectedBoat) {
         toast({ title: "Error", description: "Missing required information for booking.", variant: "destructive"});
         return;
     }
 
-    const bookingDetails = {
-        boatId: selectedBoat._id,
-        riderId: user.uid,
-        pickup: pickup,
-        destination: destination,
-        bookingType: bookingType,
-        ...(bookingType === 'seat' && { seats: numSeats }),
-        baseFare: bookingType === 'seat' ? baseFare * numSeats : baseFare * selectedBoat.capacity,
-    };
+    let bookingDetails: any;
+
+    if (activeService === 'trip') {
+        bookingDetails = {
+            boatId: selectedBoat._id,
+            riderId: user.uid,
+            pickup: pickup,
+            destination: destination,
+            bookingType: bookingType,
+            ...(bookingType === 'seat' && { seats: numSeats }),
+            baseFare: bookingType === 'seat' ? baseFare * numSeats : baseFare * selectedBoat.capacity,
+        };
+    } else { // Charter
+         bookingDetails = {
+            boatId: selectedBoat._id,
+            riderId: user.uid,
+            pickup: "Private Charter", // Or some other signifier
+            destination: `${charterDuration} hour(s)`,
+            bookingType: 'charter',
+            duration: charterDuration,
+            baseFare: (selectedBoat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED) * charterDuration,
+        };
+    }
+
 
      try {
         const response = await fetch('/api/bookings', {
@@ -389,12 +424,9 @@ export default function ProfilePage() {
     }
   };
   
-  const calculatedFare = bookingType === 'seat' 
-    ? baseFare * numSeats 
-    : selectedBoat 
-    ? baseFare * selectedBoat.capacity
-    : 0;
-
+    const calculatedFare = activeService === 'trip'
+        ? (bookingType === 'seat' ? baseFare * numSeats : (selectedBoat ? baseFare * selectedBoat.capacity : 0))
+        : (selectedBoat ? (selectedBoat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED) * charterDuration : 0);
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -416,48 +448,66 @@ export default function ProfilePage() {
              <TabsContent value="find-ride">
                 <Card className="shadow-lg mt-6">
                     <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Sailboat/> Find Your Ride</CardTitle>
-                    <CardDescription>Select your pickup and destination points to see available water taxis.</CardDescription>
+                        <Tabs value={activeService} onValueChange={(v) => {setActiveService(v as ServiceType); setBoats([])}} className="w-full">
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="trip">Book a Trip</TabsTrigger>
+                            <TabsTrigger value="charter">Charter a Boat</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
                     </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 md:gap-8">
-                            <div className="grid w-full gap-1.5">
-                                <Label htmlFor="from">From</Label>
-                                <Combobox
-                                    options={pickupOptions}
-                                    selectedValue={pickup}
-                                    onSelect={(value) => {
-                                        setPickup(value);
-                                        setDestination(''); // Reset destination when pickup changes
-                                        setBoats([]); // Clear previous results
-                                    }}
-                                    placeholder="Select pickup..."
-                                    searchPlaceholder="Search locations..."
-                                    notFoundText="No locations found."
-                                />
+                    <TabsContent value="trip">
+                        <CardContent>
+                            <CardDescription className="mb-4">Select your pickup and destination points to see available water taxis.</CardDescription>
+                            <div className="grid gap-4 md:grid-cols-2 md:gap-8">
+                                <div className="grid w-full gap-1.5">
+                                    <Label htmlFor="from">From</Label>
+                                    <Combobox
+                                        options={pickupOptions}
+                                        selectedValue={pickup}
+                                        onSelect={(value) => {
+                                            setPickup(value);
+                                            setDestination(''); 
+                                            setBoats([]);
+                                        }}
+                                        placeholder="Select pickup..."
+                                        searchPlaceholder="Search locations..."
+                                        notFoundText="No locations found."
+                                    />
+                                </div>
+                                <div className="grid w-full gap-1.5">
+                                    <Label htmlFor="to">To</Label>
+                                    <Combobox
+                                        options={destinationOptions}
+                                        selectedValue={destination}
+                                        onSelect={(value) => {
+                                            setDestination(value);
+                                            setBoats([]);
+                                        }}
+                                        placeholder="Select destination..."
+                                        searchPlaceholder="Search locations..."
+                                        notFoundText="No destinations found."
+                                        disabled={!pickup}
+                                    />
+                                </div>
                             </div>
-                            <div className="grid w-full gap-1.5">
-                                <Label htmlFor="to">To</Label>
-                                <Combobox
-                                    options={destinationOptions}
-                                    selectedValue={destination}
-                                    onSelect={(value) => {
-                                        setDestination(value);
-                                        setBoats([]); // Clear previous results
-                                    }}
-                                    placeholder="Select destination..."
-                                    searchPlaceholder="Search locations..."
-                                    notFoundText="No destinations found."
-                                    disabled={!pickup}
-                                />
-                            </div>
-                        </div>
-                    </CardContent>
-                    <CardFooter>
-                        <Button onClick={handleFindBoat} disabled={isFinding || !pickup || !destination}>
-                            {isFinding ? "Searching..." : "Find a Boat"}
-                        </Button>
-                    </CardFooter>
+                        </CardContent>
+                        <CardFooter>
+                            <Button onClick={handleFindBoats} disabled={isFinding || !pickup || !destination}>
+                                {isFinding ? "Searching..." : "Find a Boat"}
+                            </Button>
+                        </CardFooter>
+                    </TabsContent>
+                     <TabsContent value="charter">
+                        <CardContent>
+                            <CardDescription className="mb-4">Browse and hire our exclusive fleet of luxury and speed boats by the hour.</CardDescription>
+                            <p className="text-sm text-muted-foreground">Click the button below to see all available private charters.</p>
+                        </CardContent>
+                        <CardFooter>
+                             <Button onClick={handleFindBoats} disabled={isFinding}>
+                                {isFinding ? "Searching..." : "Find a Charter Boat"}
+                            </Button>
+                        </CardFooter>
+                    </TabsContent>
                 </Card>
 
                 {isFinding && (
@@ -470,24 +520,41 @@ export default function ProfilePage() {
                     </div>
                 )}
 
-                {boats.length > 0 && pickup && destination && (
+                {boats.length > 0 && (
                     <div className="space-y-6 mt-8">
-                        <h2 className="text-2xl font-bold">Available Boats from <span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></h2>
+                         <h2 className="text-2xl font-bold">
+                            {activeService === 'trip' 
+                                ? <>Available Boats from <span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></>
+                                : "Available Private Charters"
+                            }
+                        </h2>
                         <div className="grid gap-6 md:grid-cols-2">
                             {boats.map(boat => (
                                 <Card key={boat._id} className="flex flex-col">
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2"><Ship />{boat.name}</CardTitle>
-                                        <CardDescription>A reliable <span className="font-bold capitalize">{boat.type}</span> boat ready for your trip.</CardDescription>
+                                        <CardTitle className="flex items-center gap-2">
+                                            {boat.type === 'luxury' && <Gem className="text-purple-500"/>}
+                                            {boat.type === 'speed' && <Rocket className="text-orange-500"/>}
+                                            {boat.type === 'standard' && <Ship />}
+                                            {boat.name}
+                                        </CardTitle>
+                                        <CardDescription>{boat.description}</CardDescription>
                                     </CardHeader>
                                     <CardContent className="flex-grow">
                                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                             <div className="flex items-center gap-1"><UserIcon/>Capacity: {boat.capacity}</div>
                                         </div>
-                                         <p className="text-lg font-bold mt-2">Ksh {baseFare.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/seat</span></p>
+                                         <p className="text-lg font-bold mt-2">
+                                            {activeService === 'trip'
+                                                ? <>Ksh {baseFare.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/seat</span></>
+                                                : <>Ksh {(boat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED).toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/hour</span></>
+                                            }
+                                         </p>
                                     </CardContent>
                                     <CardFooter>
-                                        <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>Request a trip</Button>
+                                        <Button className="w-full" onClick={() => handleOpenBookingDialog(boat)}>
+                                           {activeService === 'trip' ? "Request a Trip" : "Request to Charter"}
+                                        </Button>
                                     </CardFooter>
                                 </Card>
                             ))}
@@ -514,7 +581,12 @@ export default function ProfilePage() {
                                     <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
                                         <div>
                                             <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
-                                            <p className="text-sm text-muted-foreground">From {booking.pickup} to {booking.destination}</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                 {booking.bookingType === 'charter' 
+                                                    ? `Private Charter (${booking.destination})`
+                                                    : `From ${booking.pickup} to ${booking.destination}`
+                                                }
+                                            </p>
                                             <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
                                             {booking.finalFare && <p className="text-xs font-bold">Fare: Ksh {booking.finalFare.toLocaleString()}</p>}
                                         </div>
@@ -578,40 +650,59 @@ export default function ProfilePage() {
        <Dialog open={isBookingDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setSelectedBoat(null); setIsBookingDialogOpen(isOpen); }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Request a Trip on {selectedBoat?.name}</DialogTitle>
+              <DialogTitle>Request a {activeService === 'trip' ? 'Trip' : 'Charter'} on {selectedBoat?.name}</DialogTitle>
               <DialogDescription>
-                Confirm your trip details and complete payment to book your ride.
+                Confirm your details and complete payment to book your ride.
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[70vh] p-1">
                 <div className="grid gap-6 py-4 px-3">
-                    <div className="space-y-4 rounded-lg border p-4">
-                        <p className="text-sm text-muted-foreground">
-                            You are booking a trip from <span className="font-semibold text-primary">{pickup}</span> to <span className="font-semibold text-primary">{destination}</span>.
-                        </p>
-                        <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
-                            <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="seat">Book one or more seats</SelectItem>
-                                <SelectItem value="whole_boat">Book the whole boat</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    {activeService === 'trip' ? (
+                        <div className="space-y-4 rounded-lg border p-4">
+                            <p className="text-sm text-muted-foreground">
+                                You are booking a trip from <span className="font-semibold text-primary">{pickup}</span> to <span className="font-semibold text-primary">{destination}</span>.
+                            </p>
+                            <Select onValueChange={(value) => setBookingType(value as 'seat' | 'whole_boat')} defaultValue={bookingType}>
+                                <SelectTrigger><SelectValue placeholder="Select booking type" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="seat">Book one or more seats</SelectItem>
+                                    <SelectItem value="whole_boat">Book the whole boat</SelectItem>
+                                </SelectContent>
+                            </Select>
 
-                        {bookingType === 'seat' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="seats">Number of Seats</Label>
+                            {bookingType === 'seat' && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="seats">Number of Seats</Label>
+                                    <Input
+                                        id="seats"
+                                        type="number"
+                                        value={numSeats}
+                                        onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                        min="1"
+                                        max={selectedBoat?.capacity}
+                                    />
+                                    <p className="text-xs text-muted-foreground">Max capacity: {selectedBoat?.capacity} seats.</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                         <div className="space-y-4 rounded-lg border p-4">
+                             <p className="text-sm text-muted-foreground">
+                                You are chartering the <span className="font-semibold text-primary">{selectedBoat?.name}</span>.
+                            </p>
+                             <div className="grid gap-2">
+                                <Label htmlFor="duration">Booking Duration (hours)</Label>
                                 <Input
-                                    id="seats"
+                                    id="duration"
                                     type="number"
-                                    value={numSeats}
-                                    onChange={(e) => setNumSeats(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                    value={charterDuration}
+                                    onChange={(e) => setCharterDuration(Math.max(1, parseInt(e.target.value, 10) || 1))}
                                     min="1"
-                                    max={selectedBoat?.capacity}
                                 />
-                                <p className="text-xs text-muted-foreground">Max capacity: {selectedBoat?.capacity} seats.</p>
                             </div>
-                        )}
-                    </div>
+                         </div>
+                    )}
+
 
                     <div className="space-y-2">
                         <div className="flex justify-between items-center font-semibold text-lg">
@@ -710,16 +801,22 @@ export default function ProfilePage() {
                                 <p className="text-right">{receiptData ? new Date(receiptData.createdAt).toLocaleString() : 'N/A'}</p>
                             </div>
                             <Separator />
-                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                <p><strong className="font-medium text-muted-foreground">From:</strong></p>
-                                <p className="text-right font-semibold">{receiptData?.pickup}</p>
-                                <p><strong className="font-medium text-muted-foreground">To:</strong></p>
-                                <p className="text-right font-semibold">{receiptData?.destination}</p>
-                             </div>
+                            {receiptData?.bookingType !== 'charter' && (
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                    <p><strong className="font-medium text-muted-foreground">From:</strong></p>
+                                    <p className="text-right font-semibold">{receiptData?.pickup}</p>
+                                    <p><strong className="font-medium text-muted-foreground">To:</strong></p>
+                                    <p className="text-right font-semibold">{receiptData?.destination}</p>
+                                </div>
+                            )}
                              <Separator/>
                              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                                 <p><strong className="font-medium text-muted-foreground">Booking Type:</strong></p>
-                                <p className="text-right">{receiptData?.bookingType === 'seat' ? `Seat(s): ${receiptData.seats}` : 'Whole Boat'}</p>
+                                <p className="text-right">{
+                                    receiptData?.bookingType === 'seat' ? `Seat(s): ${receiptData.seats}` 
+                                    : receiptData?.bookingType === 'whole_boat' ? 'Whole Boat'
+                                    : `Charter (${receiptData?.duration}hr)`
+                                }</p>
                                 
                                 <p><strong className="font-medium text-muted-foreground">Status:</strong></p>
                                 <p className="text-right capitalize font-bold">{receiptData?.status}</p>
@@ -801,6 +898,3 @@ export default function ProfilePage() {
   );
 
     
-
-    
-

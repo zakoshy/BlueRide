@@ -46,7 +46,7 @@ interface Booking {
     riderId: string;
     pickup: string;
     destination: string;
-    bookingType: 'seat' | 'whole_boat';
+    bookingType: 'seat' | 'whole_boat' | 'charter';
     seats?: number;
     status: 'pending' | 'accepted' | 'rejected' | 'confirmed' | 'completed';
     createdAt: string;
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                 licenseNumber: newBoatLicense,
                 ownerId: user.uid,
                 type: newBoatType,
-                routeIds: newBoatRoutes,
+                routeIds: newBoatType === 'standard' ? newBoatRoutes : [],
             }),
         });
 
@@ -693,7 +693,7 @@ export default function DashboardPage() {
                                     <TableRow>
                                         <TableHead>Rider</TableHead>
                                         <TableHead>Boat</TableHead>
-                                        <TableHead>Route</TableHead>
+                                        <TableHead>Route / Charter</TableHead>
                                         <TableHead>Final Fare</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead>Status</TableHead>
@@ -704,7 +704,12 @@ export default function DashboardPage() {
                                         <TableRow key={booking._id}>
                                             <TableCell>{booking.rider?.name || 'N/A'}</TableCell>
                                             <TableCell>{booking.boat?.name || 'N/A'}</TableCell>
-                                            <TableCell className="text-xs">{booking.pickup}<br/>to {booking.destination}</TableCell>
+                                            <TableCell className="text-xs">
+                                                {booking.bookingType === 'charter' 
+                                                    ? 'Private Charter'
+                                                    : <>{booking.pickup}<br/>to {booking.destination}</>
+                                                }
+                                            </TableCell>
                                             <TableCell className="font-semibold">Ksh {booking.finalFare?.toLocaleString() || booking.baseFare.toLocaleString()}</TableCell>
                                             <TableCell>{new Date(booking.createdAt).toLocaleDateString()}</TableCell>
                                             <TableCell><Badge variant={statusVariant(booking.status)}>{booking.status}</Badge></TableCell>
@@ -734,7 +739,7 @@ export default function DashboardPage() {
                                 <DialogHeader>
                                 <DialogTitle>Add New Boat</DialogTitle>
                                 <DialogDescription>
-                                    Fill in the details and assign routes. The boat will be 'Pending Validation'.
+                                    Fill in the details. Route assignment is only for standard boats.
                                 </DialogDescription>
                                 </DialogHeader>
                                 <ScrollArea className="max-h-[70vh]">
@@ -771,6 +776,7 @@ export default function DashboardPage() {
                                         <Label htmlFor="description">Description</Label>
                                         <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} required/>
                                     </div>
+                                    {newBoatType === 'standard' && (
                                     <div className="space-y-2">
                                         <Label>Assign Routes</Label>
                                         <Input 
@@ -796,6 +802,7 @@ export default function DashboardPage() {
                                             </div>
                                         </ScrollArea>
                                     </div>
+                                    )}
                                 </div>
                                 <DialogFooter>
                                     <Button type="submit" className="w-full">Save Boat</Button>
@@ -833,10 +840,12 @@ export default function DashboardPage() {
                                         notFoundText="No captains found."
                                       />
                                     </div>
-                                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleOpenManageRoutes(boat)}>
-                                        <RouteIcon className="mr-2 h-4 w-4"/>
-                                        Manage Routes
-                                    </Button>
+                                     {boat.type === 'standard' && (
+                                        <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleOpenManageRoutes(boat)}>
+                                            <RouteIcon className="mr-2 h-4 w-4"/>
+                                            Manage Routes
+                                        </Button>
+                                     )}
                                 </div>
                             </Card>
                         )) : (

@@ -3,7 +3,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare, Route as RouteIcon } from "lucide-react";
@@ -23,6 +23,9 @@ import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 import { Combobox } from "@/components/ui/combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 interface ManagedUser {
@@ -42,6 +45,7 @@ interface Boat {
     licenseNumber: string;
     isValidated: boolean;
     ownerId: string;
+    type: 'standard' | 'luxury' | 'speed';
 }
 
 interface Route {
@@ -81,6 +85,7 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [boatRoutes, setBoatRoutes] = useState<Record<string, Route[]>>({});
   const [fareProposals, setFareProposals] = useState<FareProposal[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -94,18 +99,23 @@ export default function AdminPage() {
   const [roleToPromote, setRoleToPromote] = useState<'boat_owner' | 'captain'>('boat_owner');
   const [isPromoteCaptainDialogOpen, setPromoteCaptainDialogOpen] = useState(false);
 
+  // Add Boat state
   const [newBoatName, setNewBoatName] = useState('');
   const [newBoatCapacity, setNewBoatCapacity] = useState('');
   const [newBoatDescription, setNewBoatDescription] = useState('');
   const [newBoatLicense, setNewBoatLicense] = useState('');
+  const [newBoatType, setNewBoatType] = useState<'standard' | 'luxury' | 'speed'>('standard');
+  const [newBoatRoutes, setNewBoatRoutes] = useState<string[]>([]);
+  const [routeSearch, setRouteSearch] = useState("");
 
 
   const fetchAdminData = useCallback(async () => {
     try {
-        const [usersRes, proposalsRes, reviewsRes] = await Promise.all([
+        const [usersRes, proposalsRes, reviewsRes, routesRes] = await Promise.all([
             fetch('/api/admin/users'),
             fetch('/api/fare-proposals'),
             fetch('/api/reviews'),
+            fetch('/api/routes/fares'),
         ]);
 
       if (usersRes.ok) setUsers(await usersRes.json());
@@ -116,6 +126,10 @@ export default function AdminPage() {
 
       if (reviewsRes.ok) setReviews(await reviewsRes.json());
       else toast({ title: "Error", description: "Failed to fetch reviews.", variant: "destructive" });
+        
+      if (routesRes.ok) setRoutes(await routesRes.json());
+      else toast({ title: "Error", description: "Failed to fetch routes.", variant: "destructive" });
+
 
     } catch (error) {
       console.error("Failed to fetch admin data", error);
@@ -202,7 +216,8 @@ export default function AdminPage() {
                 description: newBoatDescription,
                 licenseNumber: newBoatLicense,
                 ownerId: selectedOwner.uid,
-                type: 'standard' // Or make this selectable
+                type: newBoatType,
+                routeIds: newBoatType === 'standard' ? newBoatRoutes : []
             }),
         });
 
@@ -212,6 +227,8 @@ export default function AdminPage() {
             setNewBoatCapacity('');
             setNewBoatDescription('');
             setNewBoatLicense('');
+            setNewBoatRoutes([]);
+            setNewBoatType('standard');
             setAddBoatDialogOpen(false);
             fetchBoatsForOwner(selectedOwner.uid); // Refresh the list
         } else {
@@ -265,6 +282,23 @@ export default function AdminPage() {
       }
     }
   }
+  
+    const handleNewBoatRouteAssignmentChange = (routeId: string, isChecked: boolean) => {
+        setNewBoatRoutes(prev => {
+            if (isChecked) {
+                return [...prev, routeId];
+            } else {
+                return prev.filter(id => id !== routeId);
+            }
+        });
+    };
+    
+    const filteredDialogRoutes = useMemo(() => {
+        return routes.filter(route => 
+            route.from.toLowerCase().includes(routeSearch.toLowerCase()) ||
+            route.to.toLowerCase().includes(routeSearch.toLowerCase())
+        );
+    }, [routes, routeSearch]);
 
   const handleBoatValidationStatusChange = async (boatId: string, status: boolean) => {
     if (!selectedOwner) return;
@@ -678,36 +712,81 @@ export default function AdminPage() {
                             <DialogTrigger asChild>
                                  <Button size="sm"><PlusCircle className="mr-2 h-4 w-4"/>Add New Boat</Button>
                             </DialogTrigger>
-                             <DialogContent className="sm:max-w-[425px]">
+                             <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
                                 <DialogTitle>Add New Boat</DialogTitle>
                                 <DialogDescription>
                                     Fill in the details for the new boat. It will be added as 'Pending Validation'.
                                 </DialogDescription>
                                 </DialogHeader>
-                                <form onSubmit={handleAddBoat}>
+                                <ScrollArea className="max-h-[70vh]">
+                                <form onSubmit={handleAddBoat} className="px-4 py-2">
                                 <div className="grid gap-4 py-4">
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="boat-name" className="text-right">Name</Label>
-                                        <Input id="boat-name" value={newBoatName} onChange={(e) => setNewBoatName(e.target.value)} className="col-span-3" required/>
+                                     <div className="space-y-2">
+                                        <Label htmlFor="boat-name">Name</Label>
+                                        <Input id="boat-name" value={newBoatName} onChange={(e) => setNewBoatName(e.target.value)} required/>
                                     </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="capacity" className="text-right">Capacity</Label>
-                                        <Input id="capacity" type="number" value={newBoatCapacity} onChange={(e) => setNewBoatCapacity(e.target.value)} className="col-span-3" required/>
+                                     <div className="space-y-2">
+                                        <Label htmlFor="license">License #</Label>
+                                        <Input id="license" value={newBoatLicense} onChange={(e) => setNewBoatLicense(e.target.value)} required/>
                                     </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="license" className="text-right">License #</Label>
-                                        <Input id="license" value={newBoatLicense} onChange={(e) => setNewBoatLicense(e.target.value)} className="col-span-3" required/>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="capacity">Capacity</Label>
+                                            <Input id="capacity" type="number" value={newBoatCapacity} onChange={(e) => setNewBoatCapacity(e.target.value)} required/>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="boat-type">Type</Label>
+                                             <Select onValueChange={(value) => setNewBoatType(value as any)} defaultValue={newBoatType}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select boat type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="standard">Standard</SelectItem>
+                                                    <SelectItem value="luxury">Luxury</SelectItem>
+                                                    <SelectItem value="speed">Speed Boat</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="description" className="text-right">Description</Label>
-                                        <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} className="col-span-3" required/>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="description">Description</Label>
+                                        <Textarea id="description" value={newBoatDescription} onChange={(e) => setNewBoatDescription(e.target.value)} required/>
                                     </div>
+
+                                    {newBoatType === 'standard' && (
+                                        <div className="space-y-2">
+                                            <Label>Assign Routes</Label>
+                                            <Input 
+                                                placeholder="Search routes..."
+                                                value={routeSearch}
+                                                onChange={(e) => setRouteSearch(e.target.value)}
+                                                className="mb-2"
+                                            />
+                                             <ScrollArea className="h-40 rounded-md border p-2">
+                                                <div className="space-y-1">
+                                                {filteredDialogRoutes.map(route => (
+                                                    <div key={route._id} className="flex items-center space-x-2 p-1">
+                                                        <Checkbox
+                                                            id={`admin-new-boat-route-${route._id}`}
+                                                            checked={newBoatRoutes.includes(route._id)}
+                                                            onCheckedChange={(checked) => handleNewBoatRouteAssignmentChange(route._id, !!checked)}
+                                                        />
+                                                        <Label htmlFor={`admin-new-boat-route-${route._id}`} className="flex-1 cursor-pointer text-xs font-normal">
+                                                            {route.from} to {route.to}
+                                                        </Label>
+                                                    </div>
+                                                ))}
+                                                </div>
+                                            </ScrollArea>
+                                        </div>
+                                    )}
                                 </div>
                                 <DialogFooter>
                                     <Button type="submit">Save Boat</Button>
                                 </DialogFooter>
                                 </form>
+                                </ScrollArea>
                             </DialogContent>
                         </Dialog>
                     </div>
@@ -716,8 +795,7 @@ export default function AdminPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Name</TableHead>
-                                    <TableHead>Capacity</TableHead>
-                                    <TableHead>License #</TableHead>
+                                    <TableHead>Type</TableHead>
                                     <TableHead>Assigned Routes</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
@@ -727,8 +805,7 @@ export default function AdminPage() {
                                 {boats.map((boat) => (
                                 <TableRow key={boat._id}>
                                     <TableCell className="font-medium">{boat.name}</TableCell>
-                                    <TableCell>{boat.capacity}</TableCell>
-                                    <TableCell className="font-mono text-xs">{boat.licenseNumber}</TableCell>
+                                    <TableCell className="capitalize">{boat.type}</TableCell>
                                      <TableCell>
                                         <div className="flex items-center gap-1 text-muted-foreground">
                                            <RouteIcon className="h-4 w-4" />
@@ -767,3 +844,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
