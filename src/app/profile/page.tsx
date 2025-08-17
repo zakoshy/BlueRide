@@ -75,6 +75,13 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const handlePrint = useReactToPrint({
+    content: () => receiptRef.current,
+    documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
+    onAfterPrint: () => toast({ title: "Print Complete", description: "Your receipt has been sent to the printer."}),
+    onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
+  });
+
   const [pickupOptions, setPickupOptions] = useState<ComboboxOption[]>([]);
   const [destinationOptions, setDestinationOptions] = useState<ComboboxOption[]>([]);
   
@@ -124,13 +131,6 @@ export default function ProfilePage() {
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
   const [refundBooking, setRefundBooking] = useState<Booking | null>(null);
   const [refundReason, setRefundReason] = useState("");
-
-  const handlePrint = useReactToPrint({
-    content: () => receiptRef.current,
-    documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
-    onAfterPrint: () => toast({ title: "Print Complete", description: "Your receipt has been sent to the printer."}),
-    onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
-  });
 
   const calculatedLuggageFee = useMemo(() => {
     return hasLuggage && luggageWeight >= LUGGAGE_WEIGHT_THRESHOLD ? LUGGAGE_FEE : 0;
@@ -492,69 +492,61 @@ export default function ProfilePage() {
                 <TabsTrigger value="my-bookings">My Bookings</TabsTrigger>
             </TabsList>
 
-             <TabsContent value="find-ride">
-                <Card className="shadow-lg mt-6">
+             <TabsContent value="find-ride" className="mt-6">
+                <Card className="shadow-lg">
                     <CardHeader>
                         <Tabs value={activeService} onValueChange={(v) => {setActiveService(v as ServiceType); setBoats([])}} className="w-full">
                           <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="trip">Book a Trip</TabsTrigger>
                             <TabsTrigger value="charter">Charter a Boat</TabsTrigger>
                           </TabsList>
+                          <TabsContent value="trip" className="mt-4">
+                             <CardDescription className="mb-4">Select your pickup and destination points to see available water taxis.</CardDescription>
+                                <div className="grid gap-4 md:grid-cols-2 md:gap-8">
+                                    <div className="grid w-full gap-1.5">
+                                        <Label htmlFor="from">From</Label>
+                                        <Combobox
+                                            options={pickupOptions}
+                                            selectedValue={pickup}
+                                            onSelect={(value) => {
+                                                setPickup(value);
+                                                setDestination(''); 
+                                                setBoats([]);
+                                            }}
+                                            placeholder="Select pickup..."
+                                            searchPlaceholder="Search locations..."
+                                            notFoundText="No locations found."
+                                        />
+                                    </div>
+                                    <div className="grid w-full gap-1.5">
+                                        <Label htmlFor="to">To</Label>
+                                        <Combobox
+                                            options={destinationOptions}
+                                            selectedValue={destination}
+                                            onSelect={(value) => {
+                                                setDestination(value);
+                                                setBoats([]);
+                                            }}
+                                            placeholder="Select destination..."
+                                            searchPlaceholder="Search locations..."
+                                            notFoundText="No destinations found."
+                                            disabled={!pickup}
+                                        />
+                                    </div>
+                                </div>
+                                <Button onClick={handleFindBoats} disabled={isFinding || !pickup || !destination} className="mt-4">
+                                    {isFinding ? "Searching..." : "Find a Boat"}
+                                </Button>
+                          </TabsContent>
+                          <TabsContent value="charter" className="mt-4">
+                            <CardDescription className="mb-4">Browse and hire our exclusive fleet of luxury and speed boats by the hour for a private tour.</CardDescription>
+                                <p className="text-sm text-muted-foreground">Click the button below to see all available private charters.</p>
+                                 <Button onClick={handleFindBoats} disabled={isFinding} className="mt-4">
+                                    {isFinding ? "Searching..." : "Find a Charter Boat"}
+                                </Button>
+                          </TabsContent>
                         </Tabs>
                     </CardHeader>
-                    <TabsContent value="trip">
-                        <CardContent>
-                            <CardDescription className="mb-4">Select your pickup and destination points to see available water taxis.</CardDescription>
-                            <div className="grid gap-4 md:grid-cols-2 md:gap-8">
-                                <div className="grid w-full gap-1.5">
-                                    <Label htmlFor="from">From</Label>
-                                    <Combobox
-                                        options={pickupOptions}
-                                        selectedValue={pickup}
-                                        onSelect={(value) => {
-                                            setPickup(value);
-                                            setDestination(''); 
-                                            setBoats([]);
-                                        }}
-                                        placeholder="Select pickup..."
-                                        searchPlaceholder="Search locations..."
-                                        notFoundText="No locations found."
-                                    />
-                                </div>
-                                <div className="grid w-full gap-1.5">
-                                    <Label htmlFor="to">To</Label>
-                                    <Combobox
-                                        options={destinationOptions}
-                                        selectedValue={destination}
-                                        onSelect={(value) => {
-                                            setDestination(value);
-                                            setBoats([]);
-                                        }}
-                                        placeholder="Select destination..."
-                                        searchPlaceholder="Search locations..."
-                                        notFoundText="No destinations found."
-                                        disabled={!pickup}
-                                    />
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter>
-                            <Button onClick={handleFindBoats} disabled={isFinding || !pickup || !destination}>
-                                {isFinding ? "Searching..." : "Find a Boat"}
-                            </Button>
-                        </CardFooter>
-                    </TabsContent>
-                     <TabsContent value="charter">
-                        <CardContent>
-                            <CardDescription className="mb-4">Browse and hire our exclusive fleet of luxury and speed boats by the hour.</CardDescription>
-                            <p className="text-sm text-muted-foreground">Click the button below to see all available private charters.</p>
-                        </CardContent>
-                        <CardFooter>
-                             <Button onClick={handleFindBoats} disabled={isFinding}>
-                                {isFinding ? "Searching..." : "Find a Charter Boat"}
-                            </Button>
-                        </CardFooter>
-                    </TabsContent>
                 </Card>
 
                 {isFinding && (
@@ -571,7 +563,7 @@ export default function ProfilePage() {
                     <div className="space-y-6 mt-8">
                          <h2 className="text-2xl font-bold">
                             {activeService === 'trip' 
-                                ? <><span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></>
+                                ? <>Available Boats for: <span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></>
                                 : "Available Private Charters"
                             }
                         </h2>
@@ -594,7 +586,7 @@ export default function ProfilePage() {
                                          <p className="text-lg font-bold mt-2">
                                             {activeService === 'trip'
                                                 ? <>Ksh {baseFare.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/seat</span></>
-                                                : <>{(boat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED).toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/hour</span></>
+                                                : <>Ksh {(boat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED).toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/hour</span></>
                                             }
                                          </p>
                                     </CardContent>
@@ -1026,4 +1018,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-    
