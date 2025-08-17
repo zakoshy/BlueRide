@@ -896,5 +896,6 @@ export default function ProfilePage() {
         </Dialog>
     </div>
   );
+}
 
     
