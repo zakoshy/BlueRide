@@ -47,6 +47,7 @@ async function createTripFinancials(booking: any) {
         captainId: boat?.captainId || null,
         tripCompletedAt: new Date(),
         baseFare: booking.baseFare,
+        luggageFee: booking.luggageFee,
         adjustmentPercent: booking.adjustmentPercent,
         finalFare: booking.finalFare,
         platformFee: platformFee,
@@ -68,9 +69,9 @@ async function createTripFinancials(booking: any) {
 // POST a new booking
 export async function POST(request: Request) {
   try {
-    const { boatId, riderId, pickup, destination, bookingType, seats, baseFare } = await request.json();
+    const { boatId, riderId, pickup, destination, bookingType, seats, baseFare, luggageWeight, luggageFee, finalFare } = await request.json();
 
-    if (!boatId || !riderId || !pickup || !destination || !bookingType || !baseFare) {
+    if (!boatId || !riderId || !pickup || !destination || !bookingType || !baseFare || !finalFare) {
       return NextResponse.json({ message: 'Missing required booking fields' }, { status: 400 });
     }
 
@@ -109,7 +110,9 @@ export async function POST(request: Request) {
       bookingType,
       ...(seats && { seats }), // Conditionally add seats
       baseFare,
-      finalFare: baseFare, // Initially, final fare is the base fare
+      luggageWeight: luggageWeight || 0,
+      luggageFee: luggageFee || 0,
+      finalFare: finalFare,
       adjustmentPercent: 0, // Initially, no adjustment
       status: 'completed', // Auto-complete bookings upon creation/payment
       hasBeenReviewed: false, // New field for tracking reviews
@@ -165,6 +168,7 @@ export async function GET(request: Request) {
                     seats: 1,
                     baseFare: 1,
                     finalFare: 1,
+                    luggageFee: 1,
                     hasBeenReviewed: 1, // Pass this to the frontend
                     boat: { 
                         name: '$boatInfo.name',

@@ -3,12 +3,12 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star, Rocket, Gem } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star, Rocket, Gem, HelpCircle, Briefcase, Weight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import QRCode from 'qrcode';
 import Image from "next/image";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 // Define types for our data structures
@@ -54,6 +55,7 @@ interface Booking {
   duration?: number;
   baseFare: number;
   finalFare?: number;
+  luggageFee?: number;
   hasBeenReviewed?: boolean;
   boat?: {
     name: string;
@@ -63,6 +65,9 @@ interface Booking {
 
 type PaymentMethod = 'card' | 'mpesa' | 'paypal';
 type ServiceType = 'trip' | 'charter';
+
+const LUGGAGE_FEE = 250;
+const LUGGAGE_WEIGHT_THRESHOLD = 15;
 
 
 export default function ProfilePage() {
@@ -85,6 +90,8 @@ export default function ProfilePage() {
   const [bookingType, setBookingType] = useState<'seat' | 'whole_boat'>('seat');
   const [numSeats, setNumSeats] = useState(1);
   const [baseFare, setBaseFare] = useState(0);
+  const [hasLuggage, setHasLuggage] = useState(false);
+  const [luggageWeight, setLuggageWeight] = useState(0);
 
   // Charter booking state
   const [charterDuration, setCharterDuration] = useState(1);
@@ -106,12 +113,17 @@ export default function ProfilePage() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const receiptRef = useRef<HTMLDivElement>(null);
   
-    // Review State
+  // Review State
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState("");
+  
+  // Refund State
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+  const [refundBooking, setRefundBooking] = useState<Booking | null>(null);
+  const [refundReason, setRefundReason] = useState("");
 
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
@@ -259,7 +271,7 @@ export default function ProfilePage() {
   }, [pickup, destination, toast, activeService]);
 
 
-  const handleBookingSubmit = async () => {
+  const handleBookingSubmit = async (finalFare: number, currentLuggageFee: number) => {
     if (!user || !selectedBoat) {
         toast({ title: "Error", description: "Missing required information for booking.", variant: "destructive"});
         return;
@@ -274,8 +286,11 @@ export default function ProfilePage() {
             pickup: pickup,
             destination: destination,
             bookingType: bookingType,
-            ...(bookingType === 'seat' && { seats: numSeats }),
             baseFare: bookingType === 'seat' ? baseFare * numSeats : baseFare * selectedBoat.capacity,
+            finalFare: finalFare,
+            luggageWeight: luggageWeight,
+            luggageFee: currentLuggageFee,
+            ...(bookingType === 'seat' && { seats: numSeats }),
         };
     } else { // Charter
          bookingDetails = {
@@ -285,7 +300,10 @@ export default function ProfilePage() {
             destination: `${charterDuration} hour(s)`,
             bookingType: 'charter',
             duration: charterDuration,
-            baseFare: (selectedBoat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED) * charterDuration,
+            baseFare: finalFare,
+            finalFare: finalFare,
+            luggageFee: 0,
+            luggageWeight: 0,
         };
     }
 
@@ -326,6 +344,8 @@ export default function ProfilePage() {
 
   const handleOpenBookingDialog = (boat: Boat) => {
     setSelectedBoat(boat);
+    setHasLuggage(false);
+    setLuggageWeight(0);
     setIsBookingDialogOpen(true);
   };
 
@@ -396,6 +416,24 @@ export default function ProfilePage() {
             });
         }
     };
+    
+    const handleOpenRefundDialog = (booking: Booking) => {
+        setRefundBooking(booking);
+        setRefundReason("");
+        setIsRefundDialogOpen(true);
+    };
+    
+    const handleRefundSubmit = async () => {
+        if (!refundBooking || !refundReason) {
+            toast({ title: "Incomplete Request", description: "Please provide a reason for your refund request.", variant: "destructive" });
+            return;
+        }
+        // In a real app, this would call a backend API.
+        // For now, we simulate success and close the dialog.
+        console.log(`Refund requested for booking ${refundBooking._id}: ${refundReason}`);
+        toast({ title: "Request Submitted", description: "Your refund request has been submitted for review. You will be notified of the outcome." });
+        setIsRefundDialogOpen(false);
+    };
 
 
   if (loading || !user) {
@@ -424,9 +462,21 @@ export default function ProfilePage() {
     }
   };
   
-    const calculatedFare = activeService === 'trip'
-        ? (bookingType === 'seat' ? baseFare * numSeats : (selectedBoat ? baseFare * selectedBoat.capacity : 0))
-        : (selectedBoat ? (selectedBoat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED) * charterDuration : 0);
+  const calculatedLuggageFee = useMemo(() => {
+    return hasLuggage && luggageWeight >= LUGGAGE_WEIGHT_THRESHOLD ? LUGGAGE_FEE : 0;
+  }, [hasLuggage, luggageWeight]);
+
+  const calculatedFare = useMemo(() => {
+    let fare = 0;
+    if (activeService === 'trip') {
+        const tripFare = bookingType === 'seat' ? baseFare * numSeats : (selectedBoat ? baseFare * selectedBoat.capacity : 0);
+        fare = tripFare + calculatedLuggageFee;
+    } else { // Charter
+        fare = selectedBoat ? (selectedBoat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED) * charterDuration : 0;
+    }
+    return fare;
+  }, [activeService, bookingType, baseFare, numSeats, selectedBoat, calculatedLuggageFee, charterDuration]);
+  
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -578,7 +628,7 @@ export default function ProfilePage() {
                         ) : userBookings.length > 0 ? (
                             <div className="space-y-4">
                                 {userBookings.map(booking => (
-                                    <Card key={booking._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4">
+                                    <Card key={booking._id} className="flex flex-col sm:flex-row items-start justify-between p-4 gap-4">
                                         <div>
                                             <p className="font-semibold text-primary">{booking.boat?.name || 'A boat'}</p>
                                             <p className="text-sm text-muted-foreground">
@@ -590,12 +640,18 @@ export default function ProfilePage() {
                                             <p className="text-xs text-muted-foreground">Booked on {new Date(booking.createdAt).toLocaleDateString()}</p>
                                             {booking.finalFare && <p className="text-xs font-bold">Fare: Ksh {booking.finalFare.toLocaleString()}</p>}
                                         </div>
-                                         <div className="flex items-center gap-2 self-end sm:self-center">
+                                         <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
                                             <Badge variant={statusVariant(booking.status)}>{booking.status}</Badge>
                                              {(booking.status === 'confirmed' || booking.status === 'completed') && (
                                                 <Button variant="outline" size="sm" onClick={() => handleViewReceipt(booking)}>
                                                     <Printer className="mr-2 h-4 w-4"/>
                                                     Receipt
+                                                </Button>
+                                             )}
+                                              {booking.status === 'completed' && (
+                                                <Button variant="ghost" size="sm" onClick={() => handleOpenRefundDialog(booking)}>
+                                                    <HelpCircle className="mr-2 h-4 w-4"/>
+                                                    Request Refund
                                                 </Button>
                                              )}
                                              {booking.status === 'completed' && !booking.hasBeenReviewed && (
@@ -616,7 +672,7 @@ export default function ProfilePage() {
                                                     <AlertDialogHeader>
                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                     <AlertDialogDescription>
-                                                        This will permanently cancel your booking. This action cannot be undone.
+                                                        This will permanently cancel your booking. A 30% cancellation fee will be applied.
                                                     </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
@@ -684,6 +740,26 @@ export default function ProfilePage() {
                                     <p className="text-xs text-muted-foreground">Max capacity: {selectedBoat?.capacity} seats.</p>
                                 </div>
                             )}
+
+                            <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox id="luggage" checked={hasLuggage} onCheckedChange={(checked) => setHasLuggage(!!checked)}/>
+                                    <Label htmlFor="luggage" className="cursor-pointer">I have luggage</Label>
+                                </div>
+                                {hasLuggage && (
+                                     <div className="grid gap-2 pl-6">
+                                        <Label htmlFor="luggage-weight">Luggage Weight (kg)</Label>
+                                        <Input
+                                            id="luggage-weight"
+                                            type="number"
+                                            value={luggageWeight}
+                                            onChange={(e) => setLuggageWeight(parseInt(e.target.value, 10) || 0)}
+                                            min="0"
+                                        />
+                                        <p className="text-xs text-muted-foreground">A fee of Ksh {LUGGAGE_FEE} applies for luggage {LUGGAGE_WEIGHT_THRESHOLD}kg or more.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     ) : (
                          <div className="space-y-4 rounded-lg border p-4">
@@ -705,6 +781,12 @@ export default function ProfilePage() {
 
 
                     <div className="space-y-2">
+                         {calculatedLuggageFee > 0 && (
+                            <div className="flex justify-between items-center text-sm">
+                                <span>Luggage Fee:</span>
+                                <span>Ksh {calculatedLuggageFee.toLocaleString()}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between items-center font-semibold text-lg">
                             <span>Total Fare:</span>
                             <span>
@@ -736,7 +818,7 @@ export default function ProfilePage() {
                                         <Input id="cvc" placeholder="123"/>
                                      </div>
                                 </div>
-                                <Button onClick={handleBookingSubmit} className="w-full" disabled={calculatedFare <= 0}>
+                                <Button onClick={() => handleBookingSubmit(calculatedFare, calculatedLuggageFee)} className="w-full" disabled={calculatedFare <= 0}>
                                     Complete Payment
                                 </Button>
                             </div>
@@ -745,7 +827,7 @@ export default function ProfilePage() {
                             <div className="space-y-4 rounded-md border bg-card p-4">
                                 <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
                                 <Input id="mpesa-phone" placeholder="e.g. 0712345678" value={mpesaPhoneNumber} onChange={(e) => setMpesaPhoneNumber(e.target.value)} />
-                                <Button onClick={handleBookingSubmit} className="w-full" disabled={calculatedFare <= 0 || !mpesaPhoneNumber}>
+                                <Button onClick={() => handleBookingSubmit(calculatedFare, calculatedLuggageFee)} className="w-full" disabled={calculatedFare <= 0 || !mpesaPhoneNumber}>
                                     Complete Payment
                                 </Button>
                             </div>
@@ -753,7 +835,7 @@ export default function ProfilePage() {
                         <TabsContent value="paypal">
                             <div className="space-y-4 rounded-md border bg-card p-4 text-center">
                                <p className="text-sm text-muted-foreground">You will be redirected to PayPal to complete your purchase securely.</p>
-                               <Button onClick={handleBookingSubmit} className="w-full" disabled={calculatedFare <= 0}>
+                               <Button onClick={() => handleBookingSubmit(calculatedFare, calculatedLuggageFee)} className="w-full" disabled={calculatedFare <= 0}>
                                    <CreditCard className="mr-2 h-4 w-4"/> Continue with PayPal
                                 </Button>
                             </div>
@@ -821,6 +903,19 @@ export default function ProfilePage() {
                                 <p><strong className="font-medium text-muted-foreground">Status:</strong></p>
                                 <p className="text-right capitalize font-bold">{receiptData?.status}</p>
                             </div>
+
+                             {receiptData && receiptData.luggageFee && receiptData.luggageFee > 0 && (
+                                <>
+                                <Separator/>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                    <p><strong className="font-medium text-muted-foreground">Trip Fare:</strong></p>
+                                    <p className="text-right">Ksh {(receiptData.finalFare! - receiptData.luggageFee).toLocaleString()}</p>
+                                    <p><strong className="font-medium text-muted-foreground">Luggage Fee:</strong></p>
+                                    <p className="text-right">Ksh {receiptData.luggageFee.toLocaleString()}</p>
+                                </div>
+                                </>
+                             )}
+
                             <div className="bg-muted/50 rounded-lg p-3 mt-4 flex justify-between items-center">
                                 <p className="text-lg font-bold">Total Fare Paid:</p>
                                 <p className="text-lg font-bold">Ksh {receiptData?.finalFare?.toLocaleString()}</p>
@@ -894,8 +989,43 @@ export default function ProfilePage() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        
+        {/* Refund Dialog */}
+        <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Request a Refund</DialogTitle>
+                     <DialogDescription>
+                        Please review our refund policy before submitting a request.
+                    </DialogDescription>
+                </DialogHeader>
+                 <div className="py-4 space-y-4 text-sm">
+                    <div className="p-4 bg-secondary rounded-md space-y-2">
+                        <h4 className="font-semibold">Refund Policy</h4>
+                        <ul className="list-disc list-inside text-muted-foreground">
+                            <li>A <strong className="text-foreground">full refund</strong> is issued if the trip is cancelled by the captain or platform.</li>
+                            <li>Cancellations by the rider on confirmed trips are subject to a <strong className="text-foreground">30% penalty fee</strong>.</li>
+                            <li><strong className="text-foreground">No refunds</strong> are issued for trips that have already been completed.</li>
+                            <li>Exceptional cases will be reviewed on a case-by-case basis.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <Label htmlFor="refund-reason">Reason for Request</Label>
+                        <Textarea
+                            id="refund-reason"
+                            value={refundReason}
+                            onChange={(e) => setRefundReason(e.target.value)}
+                            placeholder="Please provide a detailed reason for your refund request..."
+                            className="mt-2"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsRefundDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleRefundSubmit} disabled={!refundReason}>Submit Request</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
-
-    
