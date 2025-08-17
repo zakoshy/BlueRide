@@ -142,14 +142,27 @@ export default function DashboardPage() {
   // State for route search in dialogs
   const [routeSearch, setRouteSearch] = useState("");
 
+   const fetchBoats = useCallback(async (uid: string) => {
+        try {
+            const boatsRes = await fetch(`/api/boats?ownerId=${uid}`);
+            if (boatsRes.ok) {
+                setBoats(await boatsRes.json());
+            } else {
+                toast({ title: "Error", description: "Failed to refresh your boats.", variant: "destructive" });
+            }
+        } catch (error) {
+            console.error("Failed to fetch boats", error);
+            toast({ title: "Error", description: "An unexpected error occurred while refreshing your boats.", variant: "destructive" });
+        }
+    }, [toast]);
+
 
   const fetchOwnerData = useCallback(async (currentUser: FirebaseUser) => {
     if (!currentUser) return;
     setLoading(true);
     setIsAdviceLoading(true);
     try {
-        const [boatsRes, bookingsRes, captainsRes, routesRes, finSummaryRes, crewPayoutsRes, adviceRes] = await Promise.all([
-            fetch(`/api/boats?ownerId=${currentUser.uid}`),
+        const [bookingsRes, captainsRes, routesRes, finSummaryRes, crewPayoutsRes, adviceRes] = await Promise.all([
             fetch(`/api/bookings/owner/${currentUser.uid}`),
             fetch('/api/captains'),
             fetch('/api/routes/fares'),
@@ -158,8 +171,7 @@ export default function DashboardPage() {
             getCoastalBusinessAdvice()
         ]);
 
-        if (boatsRes.ok) setBoats(await boatsRes.json());
-        else toast({ title: "Error", description: "Failed to fetch your boats.", variant: "destructive" });
+        fetchBoats(currentUser.uid);
 
         if (bookingsRes.ok) setBookings(await bookingsRes.json());
         else toast({ title: "Error", description: "Failed to fetch your bookings.", variant: "destructive" });
@@ -183,7 +195,7 @@ export default function DashboardPage() {
         setLoading(false);
         setIsAdviceLoading(false);
     }
-  }, [toast]);
+  }, [toast, fetchBoats]);
 
  useEffect(() => {
     if (authLoading) {
@@ -244,7 +256,7 @@ export default function DashboardPage() {
             setRouteSearch('');
             setNewBoatHomeCounty("");
             setAddBoatDialogOpen(false);
-            fetchOwnerData(user); // Refresh the list
+            fetchBoats(user.uid); // Refresh the list
         } else {
             const errorData = await response.json();
             toast({ title: "Add Failed", description: errorData.message || "Could not add boat.", variant: "destructive" });
@@ -256,6 +268,7 @@ export default function DashboardPage() {
   }
 
   const handleAssignCaptain = async (boatId: string, captainId: string) => {
+     if (!user) return;
      try {
         const response = await fetch(`/api/boats/captain`, {
             method: 'PUT',
@@ -265,7 +278,7 @@ export default function DashboardPage() {
 
         if (response.ok) {
             toast({ title: "Success", description: `Captain assigned successfully.` });
-            if (user) fetchOwnerData(user); // Refresh boats
+            fetchBoats(user.uid); // Refresh boats
         } else {
             const errorData = await response.json();
             toast({ title: "Update Failed", description: errorData.message || "Could not assign captain.", variant: "destructive" });
@@ -850,7 +863,7 @@ export default function DashboardPage() {
                                         <Badge variant={boat.isValidated ? 'default' : 'secondary'}>{boat.isValidated ? 'Validated' : 'Pending'}</Badge> 
                                         <Badge variant="outline" className="capitalize">
                                             <div className="flex items-center gap-1">
-                                            {boat.type}
+                                            {boat.type || 'Standard'}
                                             {boat.homeCounty && <span className="text-muted-foreground text-xs flex items-center gap-1">(<MapPin size={12}/>{boat.homeCounty})</span>}
                                             </div>
                                         </Badge>
@@ -1050,3 +1063,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

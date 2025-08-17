@@ -32,8 +32,8 @@ export async function GET(request: Request) {
                 status: 'completed'
             }
         },
-        { 
-            $sort: { createdAt: 1 } // Process oldest bookings first
+        {
+             $sort: { createdAt: 1 } 
         },
         {
             $lookup: {
@@ -44,57 +44,17 @@ export async function GET(request: Request) {
             }
         },
         {
-            $lookup: {
-                from: 'boats',
-                localField: 'boatId',
-                foreignField: '_id',
-                as: 'boatInfo'
-            }
-        },
-        {
-            $lookup: {
-                from: 'locations',
-                localField: 'pickup',
-                foreignField: 'name',
-                as: 'pickupLocation'
-            }
-        },
-        {
-            $lookup: {
-                from: 'locations',
-                localField: 'destination',
-                foreignField: 'name',
-                as: 'destinationLocation'
-            }
-        },
-        {
-            $unwind: { path: "$riderInfo", preserveNullAndEmptyArrays: true }
-        },
-        {
-            $unwind: { path: "$boatInfo", preserveNullAndEmptyArrays: true }
-        },
-        {
-            $unwind: { path: "$pickupLocation", preserveNullAndEmptyArrays: true }
-        },
-        {
-            $unwind: { path: "$destinationLocation", preserveNullAndEmptyArrays: true }
-        },
-        // Group by the actual journey (boat, pickup, destination)
-        {
             $group: {
                 _id: {
-                    boatId: "$boatInfo._id",
+                    boatId: "$boatId",
                     pickup: "$pickup",
                     destination: "$destination"
                 },
-                boat: { $first: "$boatInfo" },
-                pickupLocation: { $first: "$pickupLocation" },
-                destinationLocation: { $first: "$destinationLocation" },
                 passengers: { 
                     $push: {
                         bookingId: "$_id",
-                        name: "$riderInfo.name",
-                        uid: "$riderInfo.uid",
+                        name: { $arrayElemAt: [ "$riderInfo.name", 0 ] },
+                        uid: { $arrayElemAt: [ "$riderInfo.uid", 0 ] },
                         bookingType: "$bookingType",
                         seats: "$seats"
                     }
@@ -102,24 +62,45 @@ export async function GET(request: Request) {
                 earliestBookingTime: { $min: "$createdAt" }
             }
         },
+        // Stage to get the full boat and location details efficiently
+        {
+            $lookup: {
+                from: 'boats',
+                localField: '_id.boatId',
+                foreignField: '_id',
+                as: 'boat'
+            }
+        },
+        {
+             $lookup: {
+                from: 'locations',
+                localField: '_id.pickup',
+                foreignField: 'name',
+                as: 'pickupLocation'
+            }
+        },
+        {
+            $lookup: {
+                from: 'locations',
+                localField: '_id.destination',
+                foreignField: 'name',
+                as: 'destinationLocation'
+            }
+        },
         // Reshape the output
         {
             $project: {
                 _id: { $concat: [ { $toString: "$_id.boatId" }, "-", "$_id.pickup", "-", "$_id.destination" ] },
-                boat: {
-                    _id: "$boat._id",
-                    name: "$boat.name",
-                    licenseNumber: "$boat.licenseNumber"
-                },
+                boat: { $arrayElemAt: [ "$boat", 0 ] },
                 pickup: {
                     name: "$_id.pickup",
-                    lat: "$pickupLocation.lat",
-                    lng: "$pickupLocation.lng"
+                    lat: { $arrayElemAt: [ "$pickupLocation.lat", 0 ] },
+                    lng: { $arrayElemAt: [ "$pickupLocation.lng", 0 ] }
                 },
                 destination: {
                     name: "$_id.destination",
-                    lat: "$destinationLocation.lat",
-                    lng: "$destinationLocation.lng"
+                    lat: { $arrayElemAt: [ "$destinationLocation.lat", 0 ] },
+                    lng: { $arrayElemAt: [ "$destinationLocation.lng", 0 ] }
                 },
                 passengers: 1,
                 tripDate: "$earliestBookingTime"
@@ -136,4 +117,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
+    
+
     
