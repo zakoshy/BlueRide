@@ -46,7 +46,7 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between text-left font-normal"
+          className="w-full justify-between text-left font-normal truncate"
         >
           {selectedValue
             ? options.find((option) => option.value === selectedValue)?.label
