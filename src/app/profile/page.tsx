@@ -108,9 +108,10 @@ export default function ProfilePage() {
   const [isFetchingBookings, setIsFetchingBookings] = useState(false);
   
   // Receipt State
-  const [receiptData, setReceiptData] = useState<Booking | null>(null);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [receiptData, setReceiptData] = useState<Booking | null>(null);
+  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   
   // Review State
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
@@ -1017,4 +1018,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
