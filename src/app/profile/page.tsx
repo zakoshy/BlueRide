@@ -132,35 +132,20 @@ export default function ProfilePage() {
     onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
   });
 
-   const handleViewReceipt = async (booking: Booking) => {
-    setReceiptData(booking);
+  const calculatedLuggageFee = useMemo(() => {
+    return hasLuggage && luggageWeight >= LUGGAGE_WEIGHT_THRESHOLD ? LUGGAGE_FEE : 0;
+  }, [hasLuggage, luggageWeight]);
 
-    // --- Generate QR Code ---
-    const ticketInfo = {
-        bookingId: booking._id,
-        passengerName: user?.displayName,
-        from: booking.pickup,
-        to: booking.destination,
-        fare: booking.finalFare,
-        date: booking.createdAt,
-    };
-    try {
-        const qrUrl = await QRCode.toDataURL(JSON.stringify(ticketInfo));
-        setQrCodeDataUrl(qrUrl);
-    } catch (err) {
-        console.error('Failed to generate QR code', err);
-        setQrCodeDataUrl(''); // Clear any previous QR code
+  const calculatedFare = useMemo(() => {
+    let fare = 0;
+    if (activeService === 'trip') {
+        const tripFare = bookingType === 'seat' ? baseFare * numSeats : (selectedBoat ? baseFare * selectedBoat.capacity : 0);
+        fare = tripFare + calculatedLuggageFee;
+    } else { // Charter
+        fare = selectedBoat ? (selectedBoat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED) * charterDuration : 0;
     }
-    // --- End QR Code Generation ---
-
-    setIsReceiptDialogOpen(true);
-  };
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
+    return fare;
+  }, [activeService, bookingType, baseFare, numSeats, selectedBoat, calculatedLuggageFee, charterDuration]);
 
   const fetchUserBookings = useCallback(async () => {
     if (!user) return;
@@ -179,51 +164,6 @@ export default function ProfilePage() {
         setIsFetchingBookings(false);
     }
   }, [user, toast]);
-
-  useEffect(() => {
-    // Fetch all available pickup locations
-    const fetchPickupLocations = async () => {
-      try {
-        const response = await fetch('/api/routes');
-        if (response.ok) {
-          const data: string[] = await response.json();
-          const uniqueOptions = [...new Set(data)].map(loc => ({ value: loc, label: loc }));
-          setPickupOptions(uniqueOptions);
-        } else {
-          toast({ title: "Error", description: "Could not fetch available pickup locations.", variant: "destructive" });
-        }
-      } catch (error) {
-        toast({ title: "Error", description: "An unexpected error occurred while fetching locations.", variant: "destructive" });
-      }
-    };
-
-    fetchPickupLocations();
-    fetchUserBookings();
-  }, [fetchUserBookings, toast]);
-
-  // Fetch destinations when pickup changes
-  useEffect(() => {
-    if (!pickup) {
-        setDestinationOptions([]);
-        setDestination("");
-        return;
-    }
-    const fetchDestinations = async () => {
-        try {
-             const response = await fetch(`/api/routes?from=${pickup}`);
-             if (response.ok) {
-                const data: string[] = await response.json();
-                setDestinationOptions(data.map(loc => ({ value: loc, label: loc })));
-             } else {
-                toast({ title: "Error", description: "Could not fetch destinations for this route.", variant: "destructive" });
-             }
-        } catch (error) {
-             toast({ title: "Error", description: "An unexpected error occurred while fetching destinations.", variant: "destructive" });
-        }
-    }
-    fetchDestinations();
-  }, [pickup, toast]);
-
 
   const handleFindBoats = useCallback(async () => {
     setIsFinding(true);
@@ -269,7 +209,98 @@ export default function ProfilePage() {
       setIsFinding(false);
     }
   }, [pickup, destination, toast, activeService]);
+  
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
+
+  useEffect(() => {
+    // Fetch all available pickup locations
+    const fetchPickupLocations = async () => {
+      try {
+        const response = await fetch('/api/routes');
+        if (response.ok) {
+          const data: string[] = await response.json();
+          const uniqueOptions = [...new Set(data)].map(loc => ({ value: loc, label: loc }));
+          setPickupOptions(uniqueOptions);
+        } else {
+          toast({ title: "Error", description: "Could not fetch available pickup locations.", variant: "destructive" });
+        }
+      } catch (error) {
+        toast({ title: "Error", description: "An unexpected error occurred while fetching locations.", variant: "destructive" });
+      }
+    };
+
+    fetchPickupLocations();
+    fetchUserBookings();
+  }, [fetchUserBookings, toast]);
+
+  // Fetch destinations when pickup changes
+  useEffect(() => {
+    if (!pickup) {
+        setDestinationOptions([]);
+        setDestination("");
+        return;
+    }
+    const fetchDestinations = async () => {
+        try {
+             const response = await fetch(`/api/routes?from=${pickup}`);
+             if (response.ok) {
+                const data: string[] = await response.json();
+                setDestinationOptions(data.map(loc => ({ value: loc, label: loc })));
+             } else {
+                toast({ title: "Error", description: "Could not fetch destinations for this route.", variant: "destructive" });
+             }
+        } catch (error) {
+             toast({ title: "Error", description: "An unexpected error occurred while fetching destinations.", variant: "destructive" });
+        }
+    }
+    fetchDestinations();
+  }, [pickup, toast]);
+
+  if (loading || !user) {
+    return (
+       <div className="flex min-h-dvh w-full items-center justify-center bg-secondary/50 p-4">
+         <div className="w-full max-w-2xl space-y-6">
+            <Skeleton className="h-8 w-48" />
+            <Card>
+              <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+              <CardContent className="space-y-4">
+                 <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                 <Skeleton className="h-11 w-32" />
+              </CardContent>
+            </Card>
+          </div>
+       </div>
+    )
+  }
+
+  const handleViewReceipt = async (booking: Booking) => {
+    setReceiptData(booking);
+
+    // --- Generate QR Code ---
+    const ticketInfo = {
+        bookingId: booking._id,
+        passengerName: user?.displayName,
+        from: booking.pickup,
+        to: booking.destination,
+        fare: booking.finalFare,
+        date: booking.createdAt,
+    };
+    try {
+        const qrUrl = await QRCode.toDataURL(JSON.stringify(ticketInfo));
+        setQrCodeDataUrl(qrUrl);
+    } catch (err) {
+        console.error('Failed to generate QR code', err);
+        setQrCodeDataUrl(''); // Clear any previous QR code
+    }
+    // --- End QR Code Generation ---
+
+    setIsReceiptDialogOpen(true);
+  };
 
   const handleBookingSubmit = async (finalFare: number, currentLuggageFee: number) => {
     if (!user || !selectedBoat) {
@@ -435,24 +466,6 @@ export default function ProfilePage() {
         setIsRefundDialogOpen(false);
     };
 
-
-  if (loading || !user) {
-    return (
-       <div className="flex min-h-dvh w-full items-center justify-center bg-secondary/50 p-4">
-         <div className="w-full max-w-2xl space-y-6">
-            <Skeleton className="h-8 w-48" />
-            <Card>
-              <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-              <CardContent className="space-y-4">
-                 <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                 <Skeleton className="h-11 w-32" />
-              </CardContent>
-            </Card>
-          </div>
-       </div>
-    )
-  }
-  
   const statusVariant = (status: Booking['status']) => {
     switch (status) {
         case 'confirmed': return 'default';
@@ -461,22 +474,6 @@ export default function ProfilePage() {
         default: return 'outline';
     }
   };
-  
-  const calculatedLuggageFee = useMemo(() => {
-    return hasLuggage && luggageWeight >= LUGGAGE_WEIGHT_THRESHOLD ? LUGGAGE_FEE : 0;
-  }, [hasLuggage, luggageWeight]);
-
-  const calculatedFare = useMemo(() => {
-    let fare = 0;
-    if (activeService === 'trip') {
-        const tripFare = bookingType === 'seat' ? baseFare * numSeats : (selectedBoat ? baseFare * selectedBoat.capacity : 0);
-        fare = tripFare + calculatedLuggageFee;
-    } else { // Charter
-        fare = selectedBoat ? (selectedBoat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED) * charterDuration : 0;
-    }
-    return fare;
-  }, [activeService, bookingType, baseFare, numSeats, selectedBoat, calculatedLuggageFee, charterDuration]);
-  
 
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
@@ -574,7 +571,7 @@ export default function ProfilePage() {
                     <div className="space-y-6 mt-8">
                          <h2 className="text-2xl font-bold">
                             {activeService === 'trip' 
-                                ? <>Available Boats from <span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></>
+                                ? <><span className="text-primary">{pickup}</span> to <span className="text-primary">{destination}</span></>
                                 : "Available Private Charters"
                             }
                         </h2>
@@ -597,7 +594,7 @@ export default function ProfilePage() {
                                          <p className="text-lg font-bold mt-2">
                                             {activeService === 'trip'
                                                 ? <>Ksh {baseFare.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/seat</span></>
-                                                : <>Ksh {(boat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED).toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/hour</span></>
+                                                : <>{(boat.type === 'luxury' ? HOURLY_RATE_LUXURY : HOURLY_RATE_SPEED).toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/hour</span></>
                                             }
                                          </p>
                                     </CardContent>
@@ -1029,3 +1026,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+    
