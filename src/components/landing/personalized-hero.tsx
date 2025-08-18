@@ -1,11 +1,26 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
+
+const carouselImages = [
+  "/boat1.jpg",
+  "/boat2.jpg",
+  "/boat3.jpg",
+  "/boat4.jpg",
+  "/boat5.jpg",
+];
 
 export function PersonalizedHero() {
   const greeting = "Welcome to BlueRide";
@@ -35,15 +50,30 @@ export function PersonalizedHero() {
               </Button>
             </div>
           </div>
-          <Image
-            alt="A group of boats floating on top of a large body of water"
-            className="mx-auto aspect-square overflow-hidden rounded-xl object-cover object-center shadow-2xl sm:w-full"
-            data-ai-hint="boats harbor"
-            height="550"
-            src="https://images.unsplash.com/photo-1663343933973-c3386de7c762?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTE0fHxvY2VhbiUyMGJvYXRzfGVufDB8fDB8fHww"
-            width="550"
-            priority
-          />
+          
+          <Carousel className="w-full max-w-lg mx-auto" opts={{ loop: true }}>
+              <CarouselContent>
+                {carouselImages.map((src, index) => (
+                  <CarouselItem key={index}>
+                    <Card className="overflow-hidden shadow-2xl">
+                      <CardContent className="p-0">
+                        <Image
+                          src={src}
+                          alt={`BlueRide boat image ${index + 1}`}
+                          width={550}
+                          height={550}
+                          className="aspect-square w-full object-cover"
+                          priority={index === 0}
+                        />
+                      </CardContent>
+                    </Card>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2" />
+              <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2" />
+          </Carousel>
+
         </div>
       </div>
     </section>
