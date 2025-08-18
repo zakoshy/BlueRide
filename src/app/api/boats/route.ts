@@ -42,8 +42,8 @@ export async function GET(request: Request) {
         if (!ObjectId.isValid(routeId)) {
             return NextResponse.json({ message: 'Invalid routeId provided' }, { status: 400 });
         }
-        // This is the correct query to find a document where an array field contains a specific value.
-        // The routeId from the URL is a string, so it must be converted to an ObjectId for the query.
+        // This is the correct query to find a document where an array field (routeIds)
+        // contains a specific value (the ObjectId of the route).
         query.routeIds = new ObjectId(routeId);
     }
 
@@ -144,4 +144,5 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
   }
+
 
