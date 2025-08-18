@@ -18,7 +18,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
-import InteractiveMap from "@/components/interactive-map";
+import dynamic from "next/dynamic";
+
+const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-full w-full" />,
+});
+
 
 interface Passenger {
     bookingId: string;
