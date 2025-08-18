@@ -14,7 +14,7 @@ export function PersonalizedHero() {
   return (
     <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
       <div className="container px-4 md:px-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+        <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 xl:items-center">
           <div className="flex flex-col justify-center space-y-6">
             <div className="space-y-4">
                 <>
@@ -37,7 +37,7 @@ export function PersonalizedHero() {
           </div>
           <Image
             alt="A group of boats floating on top of a large body of water"
-            className="mx-auto aspect-video overflow-hidden rounded-xl object-cover object-center shadow-2xl sm:w-full lg:order-last lg:aspect-square"
+            className="mx-auto aspect-square overflow-hidden rounded-xl object-cover object-center shadow-2xl sm:w-full"
             data-ai-hint="boats harbor"
             height="550"
             src="https://images.unsplash.com/photo-1663343933973-c3386de7c762?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTE0fHxvY2VhbiUyMGJvYXRzfGVufDB8fDB8fHww"

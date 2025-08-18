@@ -42,7 +42,8 @@ export async function GET(request: Request) {
         if (!ObjectId.isValid(routeId)) {
             return NextResponse.json({ message: 'Invalid routeId provided' }, { status: 400 });
         }
-        query.routeIds = new ObjectId(routeId);
+        // Correctly query the routeIds array using $in
+        query.routeIds = { $in: [new ObjectId(routeId)] };
     }
 
     const client = await clientPromise;
