@@ -10,12 +10,10 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { useToast } from '@/hooks/use-toast';
+import { FirstMateOutput } from '@/ai/flows/first-mate-flow';
 
 interface InteractiveMapProps {
-    route: { 
-        pickup: { lat: number; lng: number };
-        destination: { lat: number; lng: number };
-    } | null;
+    route: FirstMateOutput['route'] | null;
 }
 
 const InteractiveMap = ({ route }: InteractiveMapProps) => {

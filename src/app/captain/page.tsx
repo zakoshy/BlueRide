@@ -56,7 +56,7 @@ export default function CaptainDashboardPage() {
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
-  const [route, setRoute] = useState<{ pickup: { lat: number; lng: number }; destination: { lat: number; lng: number } } | null>(null);
+  const [route, setRoute] = useState<FirstMateOutput['route'] | null>(null);
 
 
   const fetchJourneys = useCallback(async (captainId: string) => {
@@ -126,15 +126,6 @@ export default function CaptainDashboardPage() {
         if (briefingData.route) {
             setRoute(briefingData.route);
         }
-        if(briefingData.weather.wind.includes("unavailable")) {
-            toast({
-                title: "Weather Unavailable",
-                description: "The live weather forecast could not be retrieved. Please check your OpenWeatherMap API key.",
-                variant: "destructive",
-                duration: 9000,
-            })
-        }
-
     } catch (error) {
         console.error("Error fetching briefing:", error);
         toast({ title: "Briefing Error", description: "Could not get AI First Mate briefing for this trip.", variant: "destructive" });

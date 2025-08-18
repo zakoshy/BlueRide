@@ -57,8 +57,8 @@ const getLocationCoordinates = ai.defineTool(
         try {
             const client = await clientPromise;
             const db = client.db();
-            // Use a case-insensitive regex for a more flexible search
-            const location = await db.collection('locations').findOne({ name: { $regex: new RegExp(`^${locationName}$`, 'i') } });
+            // Use a case-insensitive regex for a more flexible search, matching if the name contains the location.
+            const location = await db.collection('locations').findOne({ name: { $regex: locationName, $options: 'i' } });
             
             if (!location) {
                 console.error(`Location not found in DB: ${locationName}`);
