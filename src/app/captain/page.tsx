@@ -11,19 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
-import dynamic from "next/dynamic";
-import { FirstMateInput, getFirstMateBriefing as getAIBriefing, FirstMateOutput } from "@/ai/flows/first-mate-flow";
-
-const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
-  ssr: false,
-  loading: () => <Skeleton className="h-full w-full" />,
-});
-
 
 interface Passenger {
     bookingId: string;
@@ -53,8 +44,7 @@ export default function CaptainDashboardPage() {
 
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
-  const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
-  const [isBriefingLoading, setIsBriefingLoading] = useState(false);
+ 
 
   const fetchJourneys = useCallback(async (captainId: string) => {
     setLoading(true);
@@ -83,6 +73,8 @@ export default function CaptainDashboardPage() {
     }
     if (profile?.role === 'captain' || profile?.role === 'admin') {
       setIsCaptain(true);
+       // Admins can view, but fetching might require a specific captain ID.
+       // For this dashboard, we'll fetch trips only for actual captains.
       if (profile.role === 'captain') {
          fetchJourneys(user.uid);
       } else {
@@ -93,44 +85,8 @@ export default function CaptainDashboardPage() {
     }
   }, [user, profile, authLoading, router, fetchJourneys]);
 
-  const handleSelectJourney = async (journey: Journey) => {
-    if (!journey.pickup?.name || !journey.destination?.name) {
-        toast({
-            title: "Journey Data Incomplete",
-            description: "This journey is missing location data and cannot be displayed.",
-            variant: "destructive"
-        });
-        setSelectedJourney(journey);
-        setBriefing(null);
-        return;
-    }
-
+  const handleSelectJourney = (journey: Journey) => {
     setSelectedJourney(journey);
-    setBriefing(null);
-    setIsBriefingLoading(true);
-
-    try {
-        const briefingData = await getAIBriefing({ pickup: journey.pickup.name, destination: journey.destination.name });
-        setBriefing(briefingData);
-    } catch (error) {
-        console.error("Error fetching AI briefing:", error);
-        toast({ title: "Briefing Error", description: "Could not get AI briefing for this trip.", variant: "destructive" });
-        // Set a fallback briefing
-        setBriefing({
-            weather: {
-                wind: "N/A",
-                waves: "N/A",
-                visibility: "N/A",
-            },
-            advice: "Could not retrieve real-time weather and advice. Please exercise caution and rely on your instruments.",
-            route: {
-                pickup: journey.pickup,
-                destination: journey.destination
-            }
-        });
-    } finally {
-        setIsBriefingLoading(false);
-    }
   };
   
   const handleLogout = async () => {
@@ -188,8 +144,6 @@ export default function CaptainDashboardPage() {
     );
   }
   
-  const routeForMap = briefing?.route;
-
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
        <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -237,7 +191,7 @@ export default function CaptainDashboardPage() {
         <main className="container mx-auto p-4 sm:p-6 md:p-8">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold">Captain's Dashboard</h1>
-                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned journeys. Select one to view the briefing.</p>
+                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned journeys. Select one to view the details.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -245,7 +199,7 @@ export default function CaptainDashboardPage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Journey Manifest</CardTitle>
-                            <CardDescription>Select a journey to view briefing.</CardDescription>
+                            <CardDescription>Select a journey to view the passenger list.</CardDescription>
                         </CardHeader>
                         <CardContent className="max-h-[60vh] overflow-y-auto">
                             {journeys.length > 0 ? (
@@ -256,12 +210,7 @@ export default function CaptainDashboardPage() {
                                         <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> From: <span className="font-medium">{journey.pickup.name || 'Unknown'}</span></p>
                                         <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> To: <span className="font-medium">{journey.destination.name || 'Unknown'}</span></p>
                                         <div className="mt-2">
-                                            <p className="text-xs font-semibold flex items-center gap-1"><Users size={14}/>Passenger Manifest ({journey.passengers.length})</p>
-                                            <div className="text-xs text-muted-foreground pl-2 border-l ml-1">
-                                            {journey.passengers.map(p => (
-                                                <div key={p.bookingId}>{p.name} ({p.bookingType === 'seat' ? `${p.seats} seat(s)` : 'Whole boat'})</div>
-                                            ))}
-                                            </div>
+                                            <p className="text-xs text-muted-foreground">Total Passengers: {journey.passengers.length}</p>
                                         </div>
                                     </button>
                                 ))}
@@ -274,50 +223,32 @@ export default function CaptainDashboardPage() {
                 </div>
 
                 <div className="lg:col-span-2 space-y-4">
-                     <Card className="h-96">
-                        <InteractiveMap route={routeForMap} />
-                     </Card>
-                    
-                    {isBriefingLoading && !briefing && (
-                        <Card>
-                            <CardHeader><CardTitle>Loading Briefing...</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                <Skeleton className="h-6 w-3/4"/>
-                                <Skeleton className="h-4 w-1/2"/>
-                                <Skeleton className="h-4 w-full"/>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {briefing && selectedJourney && (
+                    {selectedJourney ? (
                          <Card>
                             <CardHeader>
-                                <CardTitle>Journey Briefing: {selectedJourney.pickup.name} to {selectedJourney.destination.name}</CardTitle>
-                                <CardDescription>Your pre-trip summary from your AI First Mate.</CardDescription>
+                                <CardTitle>Trip Details: {selectedJourney.pickup.name} to {selectedJourney.destination.name}</CardTitle>
+                                <CardDescription>Passenger manifest for boat: {selectedJourney.boat.name} ({selectedJourney.boat.licenseNumber})</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div>
-                                    <h3 className="font-semibold text-lg mb-2 flex items-center gap-2"><Cloudy/> Weather Forecast</h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg"><Wind size={16}/> <strong>Wind:</strong> {briefing.weather.wind}</div>
-                                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg"><Sailboat size={16}/> <strong>Waves:</strong> {briefing.weather.waves}</div>
-                                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg"><Eye size={16}/> <strong>Visibility:</strong> {briefing.weather.visibility}</div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-lg mb-2 flex items-center gap-2"><Navigation/> Navigation Advice</h3>
-                                    <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">{briefing.advice}</p>
-                                </div>
-
+                                <ul className="divide-y">
+                                    {selectedJourney.passengers.map(p => (
+                                        <li key={p.bookingId} className="flex justify-between items-center py-2">
+                                            <span className="font-medium">{p.name}</span>
+                                            <span className="text-sm text-muted-foreground">{p.bookingType === 'seat' ? `${p.seats} seat(s)` : 'Whole boat'}</span>
+                                        </li>
+                                    ))}
+                                </ul>
                                 <div className="pt-4 flex justify-end gap-2">
                                      <Button variant="outline"><CheckSquare className="mr-2"/>Start Journey</Button>
                                 </div>
                             </CardContent>
                         </Card>
-                    )}
-                     {!selectedJourney && !isBriefingLoading && (
-                         <Card className="flex items-center justify-center min-h-48">
-                            <p className="text-muted-foreground">Please select a journey to view its briefing and route.</p>
+                    ) : (
+                         <Card className="flex items-center justify-center min-h-96">
+                            <div className="text-center">
+                                <Sailboat className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <p className="mt-4 text-muted-foreground">Please select a journey to view its details.</p>
+                            </div>
                         </Card>
                     )}
                 </div>
@@ -326,3 +257,5 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
+
+    

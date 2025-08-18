@@ -45,6 +45,9 @@ export async function GET(request: Request) {
             }
         },
         {
+            $unwind: { path: "$riderInfo", preserveNullAndEmptyArrays: true }
+        },
+        {
             $group: {
                 _id: {
                     boatId: "$boatId",
@@ -54,8 +57,8 @@ export async function GET(request: Request) {
                 passengers: { 
                     $push: {
                         bookingId: "$_id",
-                        name: { $arrayElemAt: [ "$riderInfo.name", 0 ] },
-                        uid: { $arrayElemAt: [ "$riderInfo.uid", 0 ] },
+                        name: { $ifNull: [ "$riderInfo.name", "Unknown Rider" ] },
+                        uid: { $ifNull: [ "$riderInfo.uid", "Unknown" ] },
                         bookingType: "$bookingType",
                         seats: "$seats"
                     }
@@ -88,20 +91,33 @@ export async function GET(request: Request) {
                 as: 'destinationLocation'
             }
         },
+        {
+            $unwind: { path: "$boat", preserveNullAndEmptyArrays: true }
+        },
+        {
+            $unwind: { path: "$pickupLocation", preserveNullAndEmptyArrays: true }
+        },
+        {
+            $unwind: { path: "$destinationLocation", preserveNullAndEmptyArrays: true }
+        },
         // Reshape the output
         {
             $project: {
                 _id: { $concat: [ { $toString: "$_id.boatId" }, "-", "$_id.pickup", "-", "$_id.destination" ] },
-                boat: { $arrayElemAt: [ "$boat", 0 ] },
+                boat: { 
+                    _id: "$boat._id",
+                    name: { $ifNull: ["$boat.name", "Unknown Boat"] },
+                    licenseNumber: "$boat.licenseNumber"
+                },
                 pickup: {
                     name: "$_id.pickup",
-                    lat: { $ifNull: [ { $arrayElemAt: [ "$pickupLocation.lat", 0 ] }, 0 ] },
-                    lng: { $ifNull: [ { $arrayElemAt: [ "$pickupLocation.lng", 0 ] }, 0 ] }
+                    lat: { $ifNull: [ "$pickupLocation.lat", 0 ] },
+                    lng: { $ifNull: [ "$pickupLocation.lng", 0 ] }
                 },
                 destination: {
                     name: "$_id.destination",
-                    lat: { $ifNull: [ { $arrayElemAt: [ "$destinationLocation.lat", 0 ] }, 0 ] },
-                    lng: { $ifNull: [ { $arrayElemAt: [ "$destinationLocation.lng", 0 ] }, 0 ] }
+                    lat: { $ifNull: [ "$destinationLocation.lat", 0 ] },
+                    lng: { $ifNull: [ "$destinationLocation.lng", 0 ] }
                 },
                 passengers: 1,
                 tripDate: "$earliestBookingTime"
@@ -121,3 +137,4 @@ export async function GET(request: Request) {
     
 
     
+

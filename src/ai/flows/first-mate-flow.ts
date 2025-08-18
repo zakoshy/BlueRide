@@ -57,11 +57,11 @@ const getLocationCoordinates = ai.defineTool(
         try {
             const client = await clientPromise;
             const db = client.db();
-            // Use a case-insensitive regex for a more flexible search, matching if the name contains the location.
+            // Use a case-insensitive regex for a more flexible search.
             const location = await db.collection('locations').findOne({ name: { $regex: new RegExp(locationName, 'i') } });
             
             if (!location) {
-                console.error(`Location not found in DB: ${locationName}`);
+                console.warn(`Location not found in DB: ${locationName}`);
                 return null;
             }
             
@@ -69,7 +69,7 @@ const getLocationCoordinates = ai.defineTool(
             return { lat: location.lat, lng: location.lng };
         } catch (error) {
             console.error(`Error fetching location from DB for "${locationName}":`, error);
-            // Return null to allow the flow to continue gracefully
+            // Return null to allow the flow to continue gracefully instead of crashing.
             return null;
         }
     }
@@ -110,7 +110,7 @@ const briefingFlow = ai.defineFlow(
             try {
                 const { output } = await briefingPrompt(input);
                 if (output) {
-                    console.log("Successfully generated briefing.");
+                    console.log("Successfully generated briefing on attempt", attempts);
                     return output;
                 }
                 console.warn(`Attempt ${attempts}: AI output was null. Retrying...`);
