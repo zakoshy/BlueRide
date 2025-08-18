@@ -42,8 +42,6 @@ export async function GET(request: Request) {
         if (!ObjectId.isValid(routeId)) {
             return NextResponse.json({ message: 'Invalid routeId provided' }, { status: 400 });
         }
-        // This is the correct query to find a document where an array field (routeIds)
-        // contains a specific value (the ObjectId of the route).
         query.routeIds = new ObjectId(routeId);
     }
 
@@ -146,3 +144,42 @@ export async function PUT(request: Request) {
   }
 
 
+// DELETE a boat
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const boatId = searchParams.get('boatId');
+
+        if (!boatId) {
+            return NextResponse.json({ message: 'Boat ID is required' }, { status: 400 });
+        }
+        if (!ObjectId.isValid(boatId)) {
+            return NextResponse.json({ message: 'Invalid Boat ID' }, { status: 400 });
+        }
+
+        const objectId = new ObjectId(boatId);
+        const client = await clientPromise;
+        const db = client.db();
+
+        // Perform deletion from related collections first
+        await db.collection('bookings').deleteMany({ boatId: objectId });
+        await db.collection('trip_financials').deleteMany({ boatId: objectId });
+        await db.collection('reviews').deleteMany({ boatId: objectId });
+        // Add more cleanup for other related collections if necessary
+
+        // Finally, delete the boat itself
+        const result = await db.collection('boats').deleteOne({ _id: objectId });
+
+        if (result.deletedCount === 0) {
+            return NextResponse.json({ message: 'Boat not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({ message: 'Boat and all associated data deleted successfully' }, { status: 200 });
+    } catch (error) {
+        console.error('Error deleting boat:', error);
+        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+
+    

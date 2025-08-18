@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare, Route as RouteIcon, MapPin } from "lucide-react";
+import { ArrowLeft, Shield, Users, AlertCircle, LogOut, Ship, PlusCircle, CheckCircle, XCircle, UserPlus, Anchor, BarChart3, Ban, DollarSign, Send, Star, MessageSquare, Route as RouteIcon, MapPin, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
 interface ManagedUser {
@@ -344,6 +345,27 @@ export default function AdminPage() {
         toast({ title: "Error", description: "An unexpected error occurred during status update.", variant: "destructive" });
     }
   }
+
+  const handleDeleteBoat = async (boatId: string) => {
+    if (!selectedOwner) return;
+    try {
+        const response = await fetch(`/api/boats?boatId=${boatId}`, {
+            method: 'DELETE',
+        });
+
+        if (response.ok) {
+            toast({ title: "Success", description: `Boat has been deleted successfully.` });
+            fetchBoatsForOwner(selectedOwner.uid); // Refresh the list
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Delete Failed", description: errorData.message || "Could not delete boat.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Failed to delete boat", error);
+        toast({ title: "Error", description: "An unexpected error occurred during deletion.", variant: "destructive" });
+    }
+  }
+
 
   const handleFareProposal = async (proposalId: string, status: 'approved' | 'rejected') => {
     try {
@@ -866,7 +888,7 @@ export default function AdminPage() {
                                             }
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right space-x-2">
                                         {boat.isValidated ? (
                                             <Button variant="destructive" size="sm" onClick={() => handleBoatValidationStatusChange(boat._id, false)}>
                                                 <Ban className="mr-2 h-4 w-4" /> Suspend
@@ -876,6 +898,27 @@ export default function AdminPage() {
                                                 <CheckCircle className="mr-2 h-4 w-4" /> Validate
                                             </Button>
                                         )}
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="destructive" size="sm" className="bg-red-800 hover:bg-red-900">
+                                                    <Trash2 className="mr-2 h-4 w-4"/> Delete
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This action cannot be undone. This will permanently delete the boat "{boat.name}" and all of its associated data, including bookings and financial records.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteBoat(boat._id)}>
+                                                        Yes, delete this boat
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </TableCell>
                                 </TableRow>
                                 ))}
@@ -890,3 +933,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
