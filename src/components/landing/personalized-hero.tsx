@@ -51,7 +51,7 @@ export function PersonalizedHero() {
             </div>
           </div>
           
-          <Carousel className="w-full max-w-lg mx-auto" opts={{ loop: true }}>
+          <Carousel className="w-full" opts={{ loop: true }}>
               <CarouselContent>
                 {carouselImages.map((src, index) => (
                   <CarouselItem key={index}>
