@@ -37,7 +37,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
+      <div className="container flex h-14 items-center justify-between">
         <div className="mr-4 flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={40} height={40} className="h-10 w-10 rounded-md" />
@@ -47,6 +47,7 @@ export function Header() {
           </Link>
         </div>
 
+        {/* Mobile Menu */}
         <Sheet>
           <SheetTrigger asChild>
             <Button
@@ -102,10 +103,8 @@ export function Header() {
           </SheetContent>
         </Sheet>
         
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none">
-            {/* Future search bar can go here */}
-          </div>
+        {/* Desktop Navigation */}
+        <div className="hidden flex-1 items-center justify-end md:flex">
           <nav className="flex items-center gap-2">
              {loading ? (
               <div className="h-10 w-28 animate-pulse rounded-md bg-muted" />
@@ -168,14 +167,14 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="hidden md:flex">
+              <>
                 <Button asChild variant="ghost">
                   <Link href="/login">Log In</Link>
                 </Button>
                 <Button asChild>
                   <Link href="/signup">Sign Up</Link>
                 </Button>
-              </div>
+              </>
             )}
           </nav>
         </div>
