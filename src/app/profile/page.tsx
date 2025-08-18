@@ -263,7 +263,8 @@ export default function ProfilePage() {
              const response = await fetch(`/api/routes?from=${pickup}`);
              if (response.ok) {
                 const data: string[] = await response.json();
-                setDestinationOptions(data.map(loc => ({ value: loc, label: loc })));
+                const uniqueOptions = [...new Set(data)].map(loc => ({ value: loc, label: loc }));
+                setDestinationOptions(uniqueOptions);
              } else {
                 toast({ title: "Error", description: "Could not fetch destinations for this route.", variant: "destructive" });
              }
