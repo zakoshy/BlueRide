@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
 // This is a protected route. In a real app, you'd validate the captain's session.
 
@@ -94,13 +95,13 @@ export async function GET(request: Request) {
                 boat: { $arrayElemAt: [ "$boat", 0 ] },
                 pickup: {
                     name: "$_id.pickup",
-                    lat: { $arrayElemAt: [ "$pickupLocation.lat", 0 ] },
-                    lng: { $arrayElemAt: [ "$pickupLocation.lng", 0 ] }
+                    lat: { $ifNull: [ { $arrayElemAt: [ "$pickupLocation.lat", 0 ] }, 0 ] },
+                    lng: { $ifNull: [ { $arrayElemAt: [ "$pickupLocation.lng", 0 ] }, 0 ] }
                 },
                 destination: {
                     name: "$_id.destination",
-                    lat: { $arrayElemAt: [ "$destinationLocation.lat", 0 ] },
-                    lng: { $arrayElemAt: [ "$destinationLocation.lng", 0 ] }
+                    lat: { $ifNull: [ { $arrayElemAt: [ "$destinationLocation.lat", 0 ] }, 0 ] },
+                    lng: { $ifNull: [ { $arrayElemAt: [ "$destinationLocation.lng", 0 ] }, 0 ] }
                 },
                 passengers: 1,
                 tripDate: "$earliestBookingTime"

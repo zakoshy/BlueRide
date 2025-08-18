@@ -11,14 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import type { FirstMateOutput, FirstMateInput } from "@/ai/flows/first-mate-flow";
-import { getFirstMateBriefing } from "@/ai/flows/first-mate-flow";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 import dynamic from "next/dynamic";
+import { getJourneyBriefing, type JourneyBriefing } from "./actions";
+import { FirstMateInput, getFirstMateBriefing as getAIBriefing, FirstMateOutput } from "@/ai/flows/first-mate-flow";
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   ssr: false,
@@ -56,8 +56,6 @@ export default function CaptainDashboardPage() {
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   const [briefing, setBriefing] = useState<FirstMateOutput | null>(null);
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
-  const [route, setRoute] = useState<FirstMateOutput['route'] | null>(null);
-
 
   const fetchJourneys = useCallback(async (captainId: string) => {
     setLoading(true);
@@ -86,8 +84,6 @@ export default function CaptainDashboardPage() {
     }
     if (profile?.role === 'captain' || profile?.role === 'admin') {
       setIsCaptain(true);
-       // Admins can view, but fetching might require a specific captain ID.
-       // For this dashboard, we'll fetch trips only for actual captains.
       if (profile.role === 'captain') {
          fetchJourneys(user.uid);
       } else {
@@ -107,28 +103,32 @@ export default function CaptainDashboardPage() {
         });
         setSelectedJourney(journey);
         setBriefing(null);
-        setRoute(null);
         return;
     }
 
     setSelectedJourney(journey);
     setBriefing(null);
-    setRoute(null);
     setIsBriefingLoading(true);
 
     try {
-        const input: FirstMateInput = {
-            pickup: journey.pickup.name,
-            destination: journey.destination.name
-        };
-        const briefingData = await getFirstMateBriefing(input);
+        const briefingData = await getAIBriefing({ pickup: journey.pickup.name, destination: journey.destination.name });
         setBriefing(briefingData);
-        if (briefingData.route) {
-            setRoute(briefingData.route);
-        }
     } catch (error) {
-        console.error("Error fetching briefing:", error);
-        toast({ title: "Briefing Error", description: "Could not get AI First Mate briefing for this trip.", variant: "destructive" });
+        console.error("Error fetching AI briefing:", error);
+        toast({ title: "Briefing Error", description: "Could not get AI briefing for this trip.", variant: "destructive" });
+        // Set a fallback briefing
+        setBriefing({
+            weather: {
+                wind: "N/A",
+                waves: "N/A",
+                visibility: "N/A",
+            },
+            advice: "Could not retrieve real-time weather and advice. Please exercise caution and rely on your instruments.",
+            route: {
+                pickup: journey.pickup,
+                destination: journey.destination
+            }
+        });
     } finally {
         setIsBriefingLoading(false);
     }
@@ -189,6 +189,8 @@ export default function CaptainDashboardPage() {
     );
   }
   
+  const routeForMap = briefing?.route;
+
   return (
     <div className="min-h-dvh w-full bg-secondary/50">
        <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -274,12 +276,12 @@ export default function CaptainDashboardPage() {
 
                 <div className="lg:col-span-2 space-y-4">
                      <Card className="h-96">
-                        <InteractiveMap route={route} />
+                        <InteractiveMap route={routeForMap} />
                      </Card>
                     
                     {isBriefingLoading && !briefing && (
                         <Card>
-                            <CardHeader><CardTitle>Loading First Mate Briefing...</CardTitle></CardHeader>
+                            <CardHeader><CardTitle>Loading Briefing...</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
                                 <Skeleton className="h-6 w-3/4"/>
                                 <Skeleton className="h-4 w-1/2"/>
@@ -292,7 +294,7 @@ export default function CaptainDashboardPage() {
                          <Card>
                             <CardHeader>
                                 <CardTitle>Journey Briefing: {selectedJourney.pickup.name} to {selectedJourney.destination.name}</CardTitle>
-                                <CardDescription>Your AI-powered summary for the upcoming trip.</CardDescription>
+                                <CardDescription>Your pre-trip summary from your AI First Mate.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div>
