@@ -33,8 +33,8 @@ const WeatherSchema = z.object({
 });
 
 const RouteSchema = z.object({
-    pickup: CoordinatesSchema,
-    destination: CoordinatesSchema,
+    pickup: CoordinatesSchema.nullable(),
+    destination: CoordinatesSchema.nullable(),
 });
 
 const FirstMateOutputSchema = z.object({
@@ -48,9 +48,9 @@ export type FirstMateOutput = z.infer<typeof FirstMateOutputSchema>;
 const getLocationCoordinates = ai.defineTool(
     {
         name: 'getLocationCoordinates',
-        description: 'Retrieves the latitude and longitude for a given location name from the database.',
+        description: 'Retrieves the latitude and longitude for a given location name from the database. Returns null if not found.',
         inputSchema: z.object({ locationName: z.string() }),
-        outputSchema: CoordinatesSchema,
+        outputSchema: CoordinatesSchema.nullable(),
     },
     async ({ locationName }) => {
         console.log(`Searching for location: ${locationName}`);
@@ -62,15 +62,15 @@ const getLocationCoordinates = ai.defineTool(
             
             if (!location) {
                 console.error(`Location not found in DB: ${locationName}`);
-                throw new Error(`Location not found: ${locationName}`);
+                return null;
             }
             
             console.log(`Found location: ${location.name} at ${location.lat}, ${location.lng}`);
             return { lat: location.lat, lng: location.lng };
         } catch (error) {
             console.error(`Error fetching location from DB for "${locationName}":`, error);
-            // Re-throw the error to be handled by the flow
-            throw new Error(`Failed to retrieve location data for ${locationName}.`);
+            // Return null to allow the flow to continue gracefully
+            return null;
         }
     }
 );
@@ -91,17 +91,18 @@ const getRealTimeWeather = ai.defineTool(
     async ({ lat, lng }) => {
         const apiKey = process.env.OPENWEATHERMAP_API_KEY;
         if (!apiKey) {
-            console.warn("OpenWeatherMap API key is not configured.");
-            return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
+            console.error("CRITICAL: OpenWeatherMap API key is not configured in environment variables.");
+            // Return a specific structure that signals unavailability
+            return { description: "Weather data unavailable due to missing API key.", windSpeed: 0, windDeg: 0, visibility: 0 };
         }
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric`;
         try {
             const response = await fetch(url);
             if (!response.ok) {
                  const errorData = await response.json();
-                 console.error(`Failed to fetch weather data. Status: ${response.status}. Message: ${errorData.message}`);
+                 console.error(`Failed to fetch weather data from OpenWeatherMap. Status: ${response.status}. Message: ${errorData.message}`);
                  // Pass back a clear indicator of failure
-                 return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
+                 return { description: "Weather data unavailable.", windSpeed: 0, windDeg: 0, visibility: 0 };
             }
             const data = await response.json();
             return {
@@ -111,8 +112,8 @@ const getRealTimeWeather = ai.defineTool(
                 visibility: data.visibility || 10000
             };
         } catch (error) {
-            console.error("Error fetching weather data:", error);
-            return { description: "Weather data unavailable", windSpeed: 0, windDeg: 0, visibility: 10000 };
+            console.error("Error fetching weather data from OpenWeatherMap:", error);
+            return { description: "Weather data unavailable due to a network or server error.", windSpeed: 0, windDeg: 0, visibility: 0 };
         }
     }
 );
@@ -127,11 +128,11 @@ const briefingPrompt = ai.definePrompt({
     prompt: `You are an AI First Mate for a water taxi captain in coastal Kenya. Your job is to provide a concise, professional pre-trip briefing.
 
     The captain has provided a pickup and destination location.
-    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for BOTH the pickup and the destination. This is mandatory.
-    2.  Populate the 'route' field in the output with the coordinates for both pickup and destination.
-    3.  Use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather. If the weather service is unavailable, note that in your advice.
-    4.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves, no wind means calm). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles).
-    5.  Provide brief, actionable navigation advice based on the route and the weather. Note any potential hazards (like shallow areas, reefs, or heavy traffic zones). Keep it under 50 words.
+    1.  Use the 'getLocationCoordinates' tool to find the latitude and longitude for BOTH the pickup and the destination.
+    2.  Populate the 'route' field in the output with the coordinates for both pickup and destination. If a location's coordinates are not found, its value in the 'route' field should be null.
+    3.  If destination coordinates are available, use the 'getRealTimeWeather' tool with the *destination's* coordinates to get the live weather. If coordinates are not available, or if the weather service is unavailable, note that in your advice and weather fields.
+    4.  Based on the live weather data, formulate a marine-specific forecast. Convert wind speed (m/s) to knots (1 m/s ≈ 1.94 knots). Convert wind direction from degrees to a cardinal direction (e.g., 270 degrees is 'from W'). Create a plausible wave height based on wind speed (e.g., high wind speed means larger waves, no wind means calm). Format visibility in nautical miles (1 meter ≈ 0.00054 nautical miles). If weather is unavailable, state this clearly in the weather fields.
+    5.  Provide brief, actionable navigation advice based on the route and the weather. If coordinates are missing for a location, state that clearly in your advice (e.g., "Could not find coordinates for pickup location"). Keep it under 50 words.
     6.  Return all the required data in the specified JSON format.
 
     Pickup: {{{pickup}}}
@@ -153,12 +154,11 @@ const briefingFlow = ai.defineFlow(
             attempts++;
             try {
                 const { output } = await briefingPrompt(input);
-                // Add validation to ensure route is present
-                if (output && output.route?.pickup && output.route?.destination) {
-                    console.log("Successfully generated briefing with valid route.");
+                if (output) {
+                    console.log("Successfully generated briefing.");
                     return output;
                 }
-                console.warn(`Attempt ${attempts}: AI output was null or missing route information. Retrying...`);
+                console.warn(`Attempt ${attempts}: AI output was null. Retrying...`);
             } catch (error) {
                 console.error(`Attempt ${attempts} failed with error:`, error);
                 if (attempts >= maxAttempts) {
