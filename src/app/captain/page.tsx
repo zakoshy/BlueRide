@@ -17,7 +17,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 import dynamic from "next/dynamic";
-import { getJourneyBriefing, type JourneyBriefing } from "./actions";
 import { FirstMateInput, getFirstMateBriefing as getAIBriefing, FirstMateOutput } from "@/ai/flows/first-mate-flow";
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
