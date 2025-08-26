@@ -1,12 +1,11 @@
-# To learn more about how to use Nix to configure your environment
-# see: https://firebase.google.com/docs/studio/customize-workspace
 {pkgs}: {
   # Which nixpkgs channel to use.
   channel = "stable-24.11"; # or "unstable"
-  # Use https://search.nixos.org/packages to find packages
+  # Packages to include in your environment
   packages = [
     pkgs.nodejs_20
     pkgs.zulu
+    pkgs.openssh      # <- add this line to enable ssh
   ];
   # Sets environment variables in the workspace
   env = {};
