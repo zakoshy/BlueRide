@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
     // These credentials should be in environment variables in a real app
-    const webhookUrl = 'https://zackoshy.app.n8n.cloud/webhook/captainfeedback';
+    const webhookUrl = 'https://zackoshy.app.n8n.cloud/webhook-test/captainfeedback';
     const username = 'zack';
     const password = 'edwin123';
 
