@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star, Rocket, Gem, HelpCircle, Briefcase, Weight, MapPin } from "lucide-react";
+import { Ship, User as UserIcon, Sailboat, CreditCard, BookCopy, Printer, Ticket, Bot, Trash2, Star, Rocket, Gem, HelpCircle, Briefcase, Weight, MapPin, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/header";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +16,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useReactToPrint } from 'react-to-print';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -25,6 +24,8 @@ import QRCode from 'qrcode';
 import Image from "next/image";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 // Define types for our data structures
@@ -133,13 +134,36 @@ export default function ProfilePage() {
   const [refundBooking, setRefundBooking] = useState<Booking | null>(null);
   const [refundReason, setRefundReason] = useState("");
 
-  const handlePrint = useReactToPrint({
-    content: () => receiptRef.current,
-    documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
-    onAfterPrint: () => toast({ title: "Print/Download Complete", description: "Your receipt is ready. Check your downloads folder if you saved it as a PDF."}),
-    onPrintError: () => toast({ title: "Print Error", description: "Could not print or download receipt. Please try again.", variant: "destructive" }),
-  });
-  
+  const handleDownloadPdf = async () => {
+    const element = receiptRef.current;
+    if (!element || !receiptData) {
+        toast({title: "Error", description: "Could not find receipt content to download.", variant: "destructive"});
+        return;
+    };
+    
+    toast({title: "Generating PDF...", description: "Please wait a moment."});
+
+    try {
+        const canvas = await html2canvas(element, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
+
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save(`BlueRide-Receipt-${receiptData._id}.pdf`);
+        
+        toast({title: "Download Complete", description: "Your receipt has been saved."});
+
+    } catch(error) {
+        console.error("Error generating PDF:", error);
+        toast({title: "Download Failed", description: "An unexpected error occurred while generating the PDF.", variant: "destructive"});
+    }
+  };
+
   const calculatedLuggageFee = useMemo(() => {
     return hasLuggage && luggageWeight >= LUGGAGE_WEIGHT_THRESHOLD ? LUGGAGE_FEE : 0;
   }, [hasLuggage, luggageWeight]);
@@ -872,10 +896,10 @@ export default function ProfilePage() {
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Booking Receipt</DialogTitle>
-                    <DialogDescription>Your scannable ticket. You can print this or save it as a PDF for offline access.</DialogDescription>
+                    <DialogDescription>Your scannable ticket. You can download this as a PDF for offline access.</DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[70vh] py-4">
-                    {/* This inner div is what gets printed */}
+                    {/* This inner div is what gets downloaded */}
                     <div ref={receiptRef} className="p-4 rounded-lg border bg-background text-foreground">
                         <div className="flex justify-between items-center pb-4 mb-4 border-b">
                             <div>
@@ -953,9 +977,9 @@ export default function ProfilePage() {
                 </ScrollArea>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Close</Button>
-                    <Button onClick={handlePrint}>
-                      <Printer className="mr-2 h-4 w-4" />
-                      Print / Download
+                    <Button onClick={handleDownloadPdf}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download PDF
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -1046,5 +1070,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
