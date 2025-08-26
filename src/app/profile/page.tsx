@@ -570,7 +570,7 @@ export default function ProfilePage() {
                                 </div>
                                  <Button onClick={handleFindBoats} disabled={isFinding || !charterCounty} className="mt-4">
                                     {isFinding ? "Searching..." : "Find a Charter Boat"}
-                                </Button>
+                                 </Button>
                           </TabsContent>
                         </Tabs>
                     </CardHeader>
@@ -953,10 +953,12 @@ export default function ProfilePage() {
                 </ScrollArea>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Close</Button>
-                    <Button onClick={handlePrint}>
-                        <Printer className="mr-2 h-4 w-4" />
-                        Print / Download
-                    </Button>
+                    <div onClick={handlePrint} className="cursor-pointer">
+                        <Button>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print / Download
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
