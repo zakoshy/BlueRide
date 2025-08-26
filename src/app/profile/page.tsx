@@ -138,15 +138,6 @@ export default function ProfilePage() {
     documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
     onAfterPrint: () => toast({ title: "Print/Download Complete", description: "Your receipt is ready. Check your downloads folder if you saved it as a PDF."}),
     onPrintError: () => toast({ title: "Print Error", description: "Could not print or download receipt. Please try again.", variant: "destructive" }),
-    trigger: () => {
-      // This function returns the trigger element
-      return (
-        <Button>
-          <Printer className="mr-2 h-4 w-4" />
-          Print / Download
-        </Button>
-      );
-    },
   });
   
   const calculatedLuggageFee = useMemo(() => {
@@ -962,7 +953,10 @@ export default function ProfilePage() {
                 </ScrollArea>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Close</Button>
-                    {handlePrint}
+                    <Button onClick={handlePrint}>
+                      <Printer className="mr-2 h-4 w-4" />
+                      Print / Download
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -1052,3 +1046,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
