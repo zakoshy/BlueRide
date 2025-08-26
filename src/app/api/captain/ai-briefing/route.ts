@@ -18,8 +18,8 @@ export async function POST(request: Request) {
 
         const payload = { lat, lon, destination };
 
-        // Encode credentials for Basic Authentication
-        const credentials = btoa(`${username}:${password}`);
+        // Encode credentials for Basic Authentication using Buffer for server-side compatibility
+        const credentials = Buffer.from(`${username}:${password}`).toString('base64');
 
         const webhookResponse = await fetch(webhookUrl, {
             method: 'POST',
