@@ -917,7 +917,7 @@ export default function DashboardPage() {
                                     </CardHeader>
                                     <CardContent className="p-2 pb-0">
                                         <div className="text-2xl font-bold">Ksh {financialSummary.totalOwnerShare.toLocaleString()}</div>
-                                        <p className="text-xs text-muted-foreground">From {financialSummary.tripCount} completed trips</p>
+                                        <p className="text-xs text-muted-foreground">~72% of gross revenue</p>
                                     </CardContent>
                                 </Card>
                                 <Card className="p-4">
@@ -926,7 +926,7 @@ export default function DashboardPage() {
                                     </CardHeader>
                                     <CardContent className="p-2 pb-0">
                                         <div className="text-2xl font-bold">Ksh {financialSummary.totalCaptainCommission.toLocaleString()}</div>
-                                        <p className="text-xs text-muted-foreground">Total paid to your captains</p>
+                                        <p className="text-xs text-muted-foreground">~8% of gross revenue</p>
                                     </CardContent>
                                 </Card>
                                  <Card className="p-4 bg-blue-50 dark:bg-blue-900/20">
@@ -935,7 +935,7 @@ export default function DashboardPage() {
                                     </CardHeader>
                                     <CardContent className="p-2 pb-0">
                                         <div className="text-2xl font-bold">Ksh {financialSummary.totalRevenue.toLocaleString()}</div>
-                                        <p className="text-xs text-muted-foreground">Your share + Captain share</p>
+                                        <p className="text-xs text-muted-foreground">From {financialSummary.tripCount} completed trips</p>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -957,6 +957,7 @@ export default function DashboardPage() {
                                         <TableHead>Captain</TableHead>
                                         <TableHead>Email</TableHead>
                                         <TableHead>Trips</TableHead>
+                                        <TableHead>Commission Rate</TableHead>
                                         <TableHead className="text-right">Commission Earned</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -966,6 +967,9 @@ export default function DashboardPage() {
                                             <TableCell className="font-medium">{captain.name}</TableCell>
                                             <TableCell>{captain.email}</TableCell>
                                             <TableCell>{captain.tripCount}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">10%</Badge>
+                                            </TableCell>
                                             <TableCell className="text-right font-semibold text-green-600">Ksh {captain.totalCommission.toLocaleString()}</TableCell>
                                         </TableRow>
                                     ))}
@@ -1063,4 +1067,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
