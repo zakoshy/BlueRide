@@ -903,10 +903,10 @@ export default function ProfilePage() {
                     <div ref={receiptRef} className="p-4 rounded-lg border bg-background text-foreground">
                         <div className="flex justify-between items-center pb-4 mb-4 border-b">
                             <div>
-                                <h3 className="text-xl font-bold text-primary">BlueRide</h3>
+                                <h3 className="text-2xl font-extrabold text-primary">BlueRide</h3>
                                 <p className="text-xs text-muted-foreground">Thank you for riding with us!</p>
                             </div>
-                            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={32} height={32} className="h-8 w-8 rounded-md" />
+                            <Image src="/boatlogo.jpg" alt="BlueRide Logo" width={40} height={40} className="h-10 w-10 rounded-md" />
                         </div>
 
                         <div className="space-y-4">
