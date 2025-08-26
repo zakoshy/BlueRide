@@ -19,25 +19,26 @@ export async function GET(
     const client = await clientPromise;
     const db = client.db();
 
-    // 1. Find all boats owned by the owner
-    const ownerBoats = await db.collection('boats').find({ ownerId: ownerId }).project({ _id: 1, captainId: 1 }).toArray();
-    const captainIds = ownerBoats.map(boat => boat.captainId).filter(id => id); // Get unique, non-null captain IDs
+    // 1. Find all boats owned by the owner to get their captain IDs
+    const ownerBoats = await db.collection('boats').find({ ownerId: ownerId }).project({ captainId: 1 }).toArray();
+    // Get a unique list of captain IDs assigned to this owner's boats
+    const captainIds = [...new Set(ownerBoats.map(boat => boat.captainId).filter(id => id))];
 
     if (captainIds.length === 0) {
         return NextResponse.json([], { status: 200 });
     }
     
-    // 2. Aggregate trip financials for those captains but only on trips for this owner
+    // 2. Aggregate trip financials, but only for trips associated with this specific owner
     const crewPayouts = await db.collection('trip_financials').aggregate([
         {
-            // Filter trips to only those for the specified owner and their captains
+            // The key change: Filter trips to only those for the specified owner
             $match: {
                 ownerId: ownerId,
-                captainId: { $in: captainIds }
+                captainId: { $in: captainIds } // Optional: ensure we only query for this owner's captains
             }
         },
         {
-            // Group by captain to sum up their commission
+            // Group by captain to sum up their commission from the filtered trips
             $group: {
                 _id: "$captainId",
                 totalCommission: { $sum: "$captainCommission" },
