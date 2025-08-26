@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut } from "lucide-react";
+import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut, BrainCircuit, Clock, Sun, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -33,6 +33,13 @@ interface Journey {
     tripDate: string;
 }
 
+interface AiBriefing {
+    routeSummary: string;
+    eta: string;
+    weather: string;
+    safetyTips: string[];
+}
+
 
 export default function CaptainDashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -44,6 +51,9 @@ export default function CaptainDashboardPage() {
 
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
+  
+  const [aiBriefing, setAiBriefing] = useState<AiBriefing | null>(null);
+  const [isStartingJourney, setIsStartingJourney] = useState(false);
  
 
   const fetchJourneys = useCallback(async (captainId: string) => {
@@ -87,6 +97,57 @@ export default function CaptainDashboardPage() {
 
   const handleSelectJourney = (journey: Journey) => {
     setSelectedJourney(journey);
+    setAiBriefing(null); // Clear previous briefing when selecting a new journey
+  };
+  
+  const handleStartJourney = async () => {
+    if (!selectedJourney) return;
+
+    setIsStartingJourney(true);
+    setAiBriefing(null);
+
+    const webhookUrl = 'https://zackoshy.app.n8n.cloud/webhook-test/captainfeedback';
+    const username = 'zack';
+    const password = 'edwin123';
+
+    const payload = {
+        lat: selectedJourney.pickup.lat,
+        lon: selectedJourney.pickup.lng,
+        destination: selectedJourney.destination.name,
+    };
+
+    try {
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`),
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            // Assuming the webhook returns data in the expected format.
+            // You may need to adjust this based on the actual webhook response structure.
+            setAiBriefing({
+                routeSummary: data.routeSummary || "No summary available.",
+                eta: data.eta || "N/A",
+                weather: data.weather || "No weather data.",
+                safetyTips: data.safetyTips || ["No safety tips provided."],
+            });
+            toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
+        } else {
+            const errorText = await response.text();
+            console.error("Webhook error:", errorText);
+            toast({ title: "Webhook Error", description: "Could not retrieve AI briefing from the agent.", variant: "destructive" });
+        }
+    } catch (error) {
+        console.error("Error calling webhook:", error);
+        toast({ title: "Network Error", description: "Failed to connect to the AI agent.", variant: "destructive" });
+    } finally {
+        setIsStartingJourney(false);
+    }
   };
   
   const handleLogout = async () => {
@@ -224,6 +285,7 @@ export default function CaptainDashboardPage() {
 
                 <div className="lg:col-span-2 space-y-4">
                     {selectedJourney ? (
+                        <>
                          <Card>
                             <CardHeader>
                                 <CardTitle>Trip Details: {selectedJourney.pickup.name} to {selectedJourney.destination.name}</CardTitle>
@@ -239,10 +301,54 @@ export default function CaptainDashboardPage() {
                                     ))}
                                 </ul>
                                 <div className="pt-4 flex justify-end gap-2">
-                                     <Button variant="outline"><CheckSquare className="mr-2"/>Start Journey</Button>
+                                     <Button variant="outline" onClick={handleStartJourney} disabled={isStartingJourney}>
+                                        {isStartingJourney ? "Getting Briefing..." : <><CheckSquare className="mr-2"/>Start Journey</>}
+                                     </Button>
                                 </div>
                             </CardContent>
                         </Card>
+                        
+                        {isStartingJourney && (
+                            <Card>
+                                <CardContent className="p-6">
+                                    <div className="flex items-center justify-center space-x-2">
+                                        <Skeleton className="h-5 w-5 rounded-full" />
+                                        <p className="text-muted-foreground">Generating AI pre-trip briefing...</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        
+                        {aiBriefing && (
+                             <Card className="animate-in fade-in-50">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary"/> AI Pre-Trip Briefing</CardTitle>
+                                    <CardDescription>Key information for your trip to {selectedJourney.destination.name}.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div>
+                                        <h4 className="font-semibold flex items-center gap-2"><Navigation /> Route Summary</h4>
+                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.routeSummary}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold flex items-center gap-2"><Clock /> Estimated Time of Arrival (ETA)</h4>
+                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.eta}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold flex items-center gap-2"><Sun /> Weather Conditions</h4>
+                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.weather}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold flex items-center gap-2"><ShieldAlert /> Safety Tips</h4>
+                                        <ul className="list-disc pl-11 text-sm text-muted-foreground space-y-1 mt-1">
+                                            {aiBriefing.safetyTips.map((tip, index) => <li key={index}>{tip}</li>)}
+                                        </ul>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        </>
+
                     ) : (
                          <Card className="flex items-center justify-center min-h-96">
                             <div className="text-center">
@@ -257,5 +363,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-
-    
