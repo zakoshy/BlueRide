@@ -1,0 +1,49 @@
+
+import { NextResponse } from 'next/server';
+
+// This is a protected route. In a real app, you'd validate the captain's session.
+
+export async function POST(request: Request) {
+    // These credentials should be in environment variables in a real app
+    const webhookUrl = 'https://zackoshy.app.n8n.cloud/webhook-test/captainfeedback';
+    const username = 'zack';
+    const password = 'edwin123';
+
+    try {
+        const { lat, lon, destination } = await request.json();
+
+        if (lat === undefined || lon === undefined || !destination) {
+            return NextResponse.json({ message: 'Missing required payload: lat, lon, destination' }, { status: 400 });
+        }
+
+        const payload = { lat, lon, destination };
+
+        // Encode credentials for Basic Authentication
+        const credentials = btoa(`${username}:${password}`);
+
+        const webhookResponse = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${credentials}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await webhookResponse.json();
+
+        if (!webhookResponse.ok) {
+            console.error("Webhook API Error:", data);
+            // Forward the error message from the webhook if available
+            const errorMessage = data.message || 'The AI agent failed to provide a briefing.';
+            return NextResponse.json({ message: errorMessage }, { status: webhookResponse.status });
+        }
+
+        // Forward the successful response from the webhook back to the client
+        return NextResponse.json(data, { status: 200 });
+
+    } catch (error) {
+        console.error('AI Briefing Proxy Error:', error);
+        return NextResponse.json({ message: 'An internal error occurred while contacting the AI agent.' }, { status: 500 });
+    }
+}

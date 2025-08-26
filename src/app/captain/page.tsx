@@ -106,10 +106,6 @@ export default function CaptainDashboardPage() {
     setIsStartingJourney(true);
     setAiBriefing(null);
 
-    const webhookUrl = 'https://zackoshy.app.n8n.cloud/webhook-test/captainfeedback';
-    const username = 'zack';
-    const password = 'edwin123';
-
     const payload = {
         lat: selectedJourney.pickup.lat,
         lon: selectedJourney.pickup.lng,
@@ -117,19 +113,17 @@ export default function CaptainDashboardPage() {
     };
 
     try {
-        const response = await fetch(webhookUrl, {
+        // Call our internal proxy API route
+        const response = await fetch('/api/captain/ai-briefing', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Basic ' + btoa(`${username}:${password}`),
             },
             body: JSON.stringify(payload),
         });
 
         if (response.ok) {
             const data = await response.json();
-            // Assuming the webhook returns data in the expected format.
-            // You may need to adjust this based on the actual webhook response structure.
             setAiBriefing({
                 routeSummary: data.routeSummary || "No summary available.",
                 eta: data.eta || "N/A",
@@ -138,12 +132,12 @@ export default function CaptainDashboardPage() {
             });
             toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
-            const errorText = await response.text();
-            console.error("Webhook error:", errorText);
-            toast({ title: "Webhook Error", description: "Could not retrieve AI briefing from the agent.", variant: "destructive" });
+            const errorData = await response.json();
+            console.error("Proxy API error:", errorData.message);
+            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing from the agent.", variant: "destructive" });
         }
     } catch (error) {
-        console.error("Error calling webhook:", error);
+        console.error("Error calling proxy API:", error);
         toast({ title: "Network Error", description: "Failed to connect to the AI agent.", variant: "destructive" });
     } finally {
         setIsStartingJourney(false);
