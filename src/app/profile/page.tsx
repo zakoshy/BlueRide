@@ -136,8 +136,8 @@ export default function ProfilePage() {
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
     documentTitle: `BlueRide-Receipt-${receiptData?._id || ''}`,
-    onAfterPrint: () => toast({ title: "Print Complete", description: "Your receipt has been sent to the printer."}),
-    onPrintError: () => toast({ title: "Print Error", description: "Could not print receipt. Please try again.", variant: "destructive" }),
+    onAfterPrint: () => toast({ title: "Print/Download Complete", description: "Your receipt is ready. Check your downloads folder if you saved it as a PDF."}),
+    onPrintError: () => toast({ title: "Print Error", description: "Could not print or download receipt. Please try again.", variant: "destructive" }),
     trigger: () => {
       // This function returns the trigger element
       return (
@@ -881,7 +881,7 @@ export default function ProfilePage() {
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Booking Receipt</DialogTitle>
-                    <DialogDescription>Your scannable ticket. You can print this or save it as a PDF.</DialogDescription>
+                    <DialogDescription>Your scannable ticket. You can print this or save it as a PDF for offline access.</DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[70vh] py-4">
                     {/* This inner div is what gets printed */}
@@ -1052,3 +1052,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
