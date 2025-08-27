@@ -21,10 +21,7 @@ export type CaptainBriefingInput = z.infer<typeof CaptainBriefingInputSchema>;
 
 // Define the expected output schema from the webhook
 const CaptainBriefingOutputSchema = z.object({
-  route_summary: z.string().describe("A summary of the route."),
-  eta: z.string().describe("The estimated time of arrival."),
-  weather: z.string().describe("The weather forecast for the trip."),
-  safety_tips: z.string().describe("Any relevant safety tips for the captain."),
+  output: z.string().describe("The full text output from the AI agent."),
 });
 export type CaptainBriefingOutput = z.infer<typeof CaptainBriefingOutputSchema>;
 
@@ -68,7 +65,7 @@ const captainBriefingFlow = ai.defineFlow(
       const responseData = await response.json();
       
       // The n8n webhook returns an array with the result, so we extract the first element.
-      const result = responseData[0]?.json || responseData[0];
+      const result = responseData[0];
       
       if (!result) {
           throw new Error("The AI agent returned an empty or invalid response.");

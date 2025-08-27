@@ -3,6 +3,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
+import dynamic from 'next/dynamic';
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut, BrainCircuit, Clock, Sun, ShieldAlert, Route as RouteIcon } from "lucide-react";
@@ -16,6 +17,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 import { getCaptainBriefing, type CaptainBriefingOutput } from "@/ai/flows/captain-briefing-flow";
+
+const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-full w-full" />,
+});
 
 interface Passenger {
     bookingId: string;
@@ -297,21 +303,9 @@ export default function CaptainDashboardPage() {
                                     <CardDescription>Key information for your trip to {selectedJourney.destination.name}.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                     <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><RouteIcon /> Route Summary</h4>
-                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.route_summary}</p>
-                                    </div>
-                                     <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><Clock /> Estimated Time of Arrival (ETA)</h4>
-                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.eta}</p>
-                                    </div>
                                     <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><Cloudy /> Weather</h4>
-                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.weather}</p>
-                                    </div>
-                                     <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><ShieldAlert /> Safety Tips</h4>
-                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.safety_tips}</p>
+                                        <h4 className="font-semibold flex items-center gap-2"><RouteIcon /> Route & Weather Summary</h4>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{aiBriefing.output}</p>
                                     </div>
                                 </CardContent>
                             </Card>
