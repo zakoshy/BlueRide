@@ -108,6 +108,16 @@ export default function CaptainDashboardPage() {
     setIsStartingJourney(true);
     setAiBriefing(null);
 
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
+    const username = process.env.NEXT_PUBLIC_N8N_USERNAME;
+    const password = process.env.NEXT_PUBLIC_N8N_PASSWORD;
+
+    if (!webhookUrl || !username || !password) {
+        toast({ title: "Configuration Error", description: "The AI agent is not configured correctly.", variant: "destructive"});
+        setIsStartingJourney(false);
+        return;
+    }
+
     try {
         const payload = [{
               lat: selectedJourney.pickup.lat,
@@ -115,18 +125,25 @@ export default function CaptainDashboardPage() {
               destination: selectedJourney.destination.name
         }];
 
-        const response = await fetch('/api/captain/briefing', {
+        const response = await fetch(webhookUrl, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${btoa(`${username}:${password}`)}`
+          },
           body: JSON.stringify(payload)
         });
         
         if (response.ok) {
-            const briefing = await response.json();
-            setAiBriefing(briefing);
-            toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
+            const briefing: CaptainBriefingOutput[] = await response.json();
+            if (briefing && briefing.length > 0 && briefing[0].output) {
+                setAiBriefing(briefing);
+                toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
+            } else {
+                toast({ title: "Briefing Error", description: "Received an empty or invalid response from the AI agent.", variant: "destructive" });
+            }
         } else {
-            const errorData = await response.json();
+            const errorData = await response.json().catch(() => ({ message: `The AI agent returned a non-OK status: ${response.status}` }));
             console.error("Briefing API error:", errorData.message);
             toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing.", variant: "destructive" });
         }
@@ -337,5 +354,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-
-    
