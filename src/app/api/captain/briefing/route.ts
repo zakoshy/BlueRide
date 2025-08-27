@@ -20,7 +20,8 @@ export async function POST(request: Request) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+                // Use btoa for universal base64 encoding, instead of Node.js Buffer
+                'Authorization': `Basic ${btoa(`${username}:${password}`)}`
             },
             body: JSON.stringify(payload),
         });
