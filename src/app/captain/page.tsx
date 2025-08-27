@@ -16,7 +16,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 import { getFirstMateBriefing, type FirstMateOutput } from "@/ai/flows/first-mate-flow";
-import InteractiveMap from "@/components/interactive-map";
+import dynamic from 'next/dynamic';
+
+const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
+  ssr: false,
+  loading: () => <Skeleton className="h-full w-full min-h-[250px] rounded-md border" />
+});
+
 
 interface Passenger {
     bookingId: string;
@@ -336,4 +342,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-
