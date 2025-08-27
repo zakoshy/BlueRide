@@ -33,14 +33,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ message }, { status: response.status });
         }
 
-        // Assuming the response is the array with the single object containing the output
-        if (Array.isArray(responseData) && responseData.length > 0 && responseData[0].output) {
-            return NextResponse.json({ output: responseData[0].output }, { status: 200 });
-        } else {
-             // Handle cases where the format is unexpected
-             console.error("Unexpected response format from webhook:", responseData);
-             return NextResponse.json({ message: 'Received an unexpected response format from the AI agent.' }, { status: 500 });
-        }
+        // Directly forward the response from the webhook
+        return NextResponse.json(responseData, { status: 200 });
         
     } catch (error) {
         console.error('Error calling captain briefing webhook:', error);

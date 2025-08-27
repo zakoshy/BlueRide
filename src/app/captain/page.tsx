@@ -54,7 +54,7 @@ export default function CaptainDashboardPage() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   
-  const [aiBriefing, setAiBriefing] = useState<CaptainBriefingOutput | null>(null);
+  const [aiBriefing, setAiBriefing] = useState<CaptainBriefingOutput[] | null>(null);
   const [isStartingJourney, setIsStartingJourney] = useState(false);
  
 
@@ -305,7 +305,7 @@ export default function CaptainDashboardPage() {
                             </Card>
                         )}
                         
-                        {aiBriefing && (
+                        {aiBriefing && Array.isArray(aiBriefing) && aiBriefing.length > 0 && (
                              <Card className="animate-in fade-in-50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary"/> AI Agent Briefing</CardTitle>
@@ -314,7 +314,7 @@ export default function CaptainDashboardPage() {
                                 <CardContent className="space-y-4">
                                     <div>
                                         <h4 className="font-semibold flex items-center gap-2"><RouteIcon /> Route & Weather Summary</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{aiBriefing.output}</p>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{aiBriefing[0].output}</p>
                                     </div>
                                 </CardContent>
                             </Card>
