@@ -10,13 +10,13 @@ export async function POST(request: Request) {
     const password = 'edwin123';
 
     try {
-        const { lat, lon, destination } = await request.json();
+        const { lat, long, destination } = await request.json();
 
-        if (lat === undefined || lon === undefined || !destination) {
-            return NextResponse.json({ message: 'Missing required payload: lat, lon, destination' }, { status: 400 });
+        if (lat === undefined || long === undefined || !destination) {
+            return NextResponse.json({ message: 'Missing required payload: lat, long, destination' }, { status: 400 });
         }
 
-        const payload = { lat, lon, destination };
+        const payload = { lat, long, destination };
 
         // Encode credentials for Basic Authentication using Buffer for server-side compatibility
         const credentials = Buffer.from(`${username}:${password}`).toString('base64');

@@ -108,7 +108,7 @@ export default function CaptainDashboardPage() {
 
     const payload = {
         lat: selectedJourney.pickup.lat,
-        lon: selectedJourney.pickup.lng,
+        long: selectedJourney.pickup.lng,
         destination: selectedJourney.destination.name,
     };
 
