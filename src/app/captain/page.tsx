@@ -109,14 +109,16 @@ export default function CaptainDashboardPage() {
     setAiBriefing(null);
 
     try {
-        const response = await fetch('/api/captain/briefing', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
+        const payload = [{
               lat: selectedJourney.pickup.lat,
               long: selectedJourney.pickup.lng,
               destination: selectedJourney.destination.name
-          })
+        }];
+
+        const response = await fetch('/api/captain/briefing', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
         });
         
         if (response.ok) {
@@ -125,12 +127,12 @@ export default function CaptainDashboardPage() {
             toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
             const errorData = await response.json();
-            console.error("Proxy API error:", errorData.message);
-            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing from the agent.", variant: "destructive" });
+            console.error("Briefing API error:", errorData.message);
+            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing.", variant: "destructive" });
         }
     } catch (error: any) {
         console.error("Error getting AI briefing:", error);
-        toast({ title: "Briefing Error", description: error.message || "Could not retrieve AI briefing from the agent.", variant: "destructive" });
+        toast({ title: "Briefing Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
     } finally {
         setIsStartingJourney(false);
     }

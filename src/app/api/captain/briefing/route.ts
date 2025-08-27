@@ -2,43 +2,42 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-    const { lat, long, destination } = await request.json();
-
-    if (lat === undefined || long === undefined || !destination) {
-        return NextResponse.json({ message: 'Missing required fields: lat, long, destination' }, { status: 400 });
-    }
-
     const webhookUrl = 'https://zackoshy.app.n8n.cloud/webhook/captainfeedback';
     const username = 'zack';
     const password = 'edwin123';
 
-    // The webhook expects an array with a single object
-    const payload = [{ lat, long, destination }];
-
     try {
+        // Get the raw body from the incoming request
+        const body = await request.json();
+
+        // Forward the request directly to the n8n webhook
         const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // Use btoa for universal base64 encoding, instead of Node.js Buffer
                 'Authorization': `Basic ${btoa(`${username}:${password}`)}`
             },
-            body: JSON.stringify(payload),
+            // Pass the original body through
+            body: JSON.stringify(body),
         });
-
-        const responseData = await response.json();
         
+        // Check if the webhook response is successful
         if (!response.ok) {
-            console.error(`Webhook error: ${response.status} ${response.statusText}`, responseData);
-            const message = responseData?.message || `The AI agent returned an error: ${response.statusText}`;
+            // Attempt to get more detailed error info from the webhook's response
+            const errorData = await response.json().catch(() => ({ message: `The AI agent returned a non-OK status: ${response.status}` }));
+            console.error(`Webhook error: ${response.status} ${response.statusText}`, errorData);
+            const message = errorData?.message || `The AI agent returned an error: ${response.statusText}`;
             return NextResponse.json({ message }, { status: response.status });
         }
+        
+        // Get the JSON response from the webhook
+        const responseData = await response.json();
 
-        // Directly forward the response from the webhook
+        // Directly forward the successful response from the webhook to the client
         return NextResponse.json(responseData, { status: 200 });
         
     } catch (error) {
-        console.error('Error calling captain briefing webhook:', error);
+        console.error('Error in briefing proxy route:', error);
         return NextResponse.json({ message: 'An internal error occurred while contacting the AI agent.' }, { status: 500 });
     }
 }
