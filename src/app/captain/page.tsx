@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut, BrainCircuit, Clock, Sun, ShieldAlert } from "lucide-react";
+import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut, BrainCircuit, Clock, Sun, ShieldAlert, Route } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,6 +15,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
+import { getFirstMateBriefing, type FirstMateOutput } from "@/ai/flows/first-mate-flow";
+import InteractiveMap from "@/components/interactive-map";
 
 interface Passenger {
     bookingId: string;
@@ -33,13 +35,6 @@ interface Journey {
     tripDate: string;
 }
 
-interface AiBriefing {
-    routeSummary: string;
-    eta: string;
-    weather: string;
-    safetyTips: string[];
-}
-
 
 export default function CaptainDashboardPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -52,7 +47,7 @@ export default function CaptainDashboardPage() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   
-  const [aiBriefing, setAiBriefing] = useState<AiBriefing | null>(null);
+  const [aiBriefing, setAiBriefing] = useState<FirstMateOutput | null>(null);
   const [isStartingJourney, setIsStartingJourney] = useState(false);
  
 
@@ -106,39 +101,22 @@ export default function CaptainDashboardPage() {
     setIsStartingJourney(true);
     setAiBriefing(null);
 
-    const payload = {
-        lat: selectedJourney.pickup.lat,
-        long: selectedJourney.pickup.lng,
-        destination: selectedJourney.destination.name,
-    };
-
     try {
-        // Call our internal proxy API route
-        const response = await fetch('/api/captain/ai-briefing', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
+        const briefing = await getFirstMateBriefing({
+            pickup: selectedJourney.pickup.name,
+            destination: selectedJourney.destination.name
         });
-
-        if (response.ok) {
-            const data = await response.json();
-            setAiBriefing({
-                routeSummary: data.routeSummary || "No summary available.",
-                eta: data.eta || "N/A",
-                weather: data.weather || "No weather data.",
-                safetyTips: data.safetyTips || ["No safety tips provided."],
-            });
+        
+        if (briefing) {
+            setAiBriefing(briefing);
             toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
-            const errorData = await response.json();
-            console.error("Proxy API error:", errorData.message);
-            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing from the agent.", variant: "destructive" });
+            throw new Error("Received an empty briefing from the AI First Mate.");
         }
+
     } catch (error) {
-        console.error("Error calling proxy API:", error);
-        toast({ title: "Network Error", description: "Failed to connect to the AI agent.", variant: "destructive" });
+        console.error("Error getting AI briefing:", error);
+        toast({ title: "Briefing Error", description: "Could not retrieve AI briefing from the First Mate.", variant: "destructive" });
     } finally {
         setIsStartingJourney(false);
     }
@@ -307,7 +285,7 @@ export default function CaptainDashboardPage() {
                                 <CardContent className="p-6">
                                     <div className="flex items-center justify-center space-x-2">
                                         <Skeleton className="h-5 w-5 rounded-full" />
-                                        <p className="text-muted-foreground">Generating AI pre-trip briefing...</p>
+                                        <p className="text-muted-foreground">Generating AI First Mate briefing...</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -316,27 +294,28 @@ export default function CaptainDashboardPage() {
                         {aiBriefing && (
                              <Card className="animate-in fade-in-50">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary"/> AI Pre-Trip Briefing</CardTitle>
+                                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary"/> AI First Mate Briefing</CardTitle>
                                     <CardDescription>Key information for your trip to {selectedJourney.destination.name}.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><Navigation /> Route Summary</h4>
-                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.routeSummary}</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><Clock /> Estimated Time of Arrival (ETA)</h4>
-                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.eta}</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><Sun /> Weather Conditions</h4>
-                                        <p className="text-sm text-muted-foreground pl-6">{aiBriefing.weather}</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><ShieldAlert /> Safety Tips</h4>
-                                        <ul className="list-disc pl-11 text-sm text-muted-foreground space-y-1 mt-1">
-                                            {aiBriefing.safetyTips.map((tip, index) => <li key={index}>{tip}</li>)}
-                                        </ul>
+                                <CardContent className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <h4 className="font-semibold flex items-center gap-2"><Navigation /> Navigation Advice</h4>
+                                                <p className="text-sm text-muted-foreground pl-6">{aiBriefing.advice}</p>
+                                            </div>
+                                             <div>
+                                                <h4 className="font-semibold flex items-center gap-2"><Cloudy /> Marine Weather</h4>
+                                                 <div className="text-sm text-muted-foreground pl-6 grid grid-cols-2 gap-x-4 gap-y-1">
+                                                    <span className="flex items-center gap-1"><Wind size={14}/>Wind:</span> <span>{aiBriefing.weather.wind}</span>
+                                                    <span className="flex items-center gap-1"><Route size={14}/>Waves:</span> <span>{aiBriefing.weather.waves}</span>
+                                                    <span className="flex items-center gap-1"><Eye size={14}/>Visibility:</span> <span>{aiBriefing.weather.visibility}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="min-h-[250px] rounded-md overflow-hidden border">
+                                            <InteractiveMap route={aiBriefing.route || null} />
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -357,3 +336,4 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
+
