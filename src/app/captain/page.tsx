@@ -16,7 +16,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
-import { getCaptainBriefing, type CaptainBriefingOutput } from "@/ai/flows/captain-briefing-flow";
+
+interface CaptainBriefingOutput {
+  output: string;
+}
 
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   ssr: false,
@@ -106,19 +109,25 @@ export default function CaptainDashboardPage() {
     setAiBriefing(null);
 
     try {
-        const briefing = await getCaptainBriefing({
-            lat: selectedJourney.pickup.lat,
-            long: selectedJourney.pickup.lng,
-            destination: selectedJourney.destination.name
+        const response = await fetch('/api/captain/briefing', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+              lat: selectedJourney.pickup.lat,
+              long: selectedJourney.pickup.lng,
+              destination: selectedJourney.destination.name
+          })
         });
         
-        if (briefing) {
+        if (response.ok) {
+            const briefing = await response.json();
             setAiBriefing(briefing);
             toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
-            throw new Error("Received an empty briefing from the AI agent.");
+            const errorData = await response.json();
+            console.error("Proxy API error:", errorData.message);
+            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing from the agent.", variant: "destructive" });
         }
-
     } catch (error: any) {
         console.error("Error getting AI briefing:", error);
         toast({ title: "Briefing Error", description: error.message || "Could not retrieve AI briefing from the agent.", variant: "destructive" });
@@ -326,3 +335,5 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
+
+    
