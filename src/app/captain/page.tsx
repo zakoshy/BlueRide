@@ -17,10 +17,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
 
-interface CaptainBriefingOutput {
-  output: string;
-}
-
 const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
   ssr: false,
   loading: () => <Skeleton className="h-full w-full" />,
@@ -54,7 +50,7 @@ export default function CaptainDashboardPage() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   
-  const [aiBriefing, setAiBriefing] = useState<CaptainBriefingOutput[] | null>(null);
+  const [aiBriefing, setAiBriefing] = useState<string | null>(null);
   const [isStartingJourney, setIsStartingJourney] = useState(false);
  
 
@@ -135,17 +131,17 @@ export default function CaptainDashboardPage() {
         });
         
         if (response.ok) {
-            const briefing: CaptainBriefingOutput[] = await response.json();
-            if (briefing && briefing.length > 0 && briefing[0].output) {
-                setAiBriefing(briefing);
+            const briefingText = await response.text();
+            if (briefingText) {
+                setAiBriefing(briefingText);
                 toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
             } else {
-                toast({ title: "Briefing Error", description: "Received an empty or invalid response from the AI agent.", variant: "destructive" });
+                toast({ title: "Briefing Error", description: "Received an empty response from the AI agent.", variant: "destructive" });
             }
         } else {
-            const errorData = await response.json().catch(() => ({ message: `The AI agent returned a non-OK status: ${response.status}` }));
-            console.error("Briefing API error:", errorData.message);
-            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing.", variant: "destructive" });
+            const errorText = await response.text();
+            console.error("Briefing API error:", errorText);
+            toast({ title: "Briefing Error", description: errorText || "Could not retrieve AI briefing.", variant: "destructive" });
         }
     } catch (error: any) {
         console.error("Error getting AI briefing:", error);
@@ -324,7 +320,7 @@ export default function CaptainDashboardPage() {
                             </Card>
                         )}
                         
-                        {aiBriefing && Array.isArray(aiBriefing) && aiBriefing.length > 0 && (
+                        {aiBriefing && (
                              <Card className="animate-in fade-in-50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><BrainCircuit className="text-primary"/> AI Agent Briefing</CardTitle>
@@ -333,7 +329,7 @@ export default function CaptainDashboardPage() {
                                 <CardContent className="space-y-4">
                                     <div>
                                         <h4 className="font-semibold flex items-center gap-2"><RouteIcon /> Route & Weather Summary</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{aiBriefing[0].output}</p>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{aiBriefing}</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -354,3 +350,5 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
+
+    
