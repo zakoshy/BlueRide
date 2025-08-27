@@ -114,18 +114,15 @@ export async function POST(request: Request) {
       luggageFee: luggageFee || 0,
       finalFare: finalFare,
       adjustmentPercent: 0, // Initially, no adjustment
-      status: 'completed', // Auto-complete bookings upon creation/payment
+      status: 'confirmed', // Start as confirmed, captain will complete it
       hasBeenReviewed: false, // New field for tracking reviews
       createdAt: new Date(),
     };
 
     const result = await bookingsCollection.insertOne(newBooking);
     
-    // Create the financial record immediately
-    const insertedBooking = { ...newBooking, _id: result.insertedId };
-    await createTripFinancials(insertedBooking);
-
-
+    // Financial record is now created when captain marks trip as 'completed'
+    
     return NextResponse.json({ message: 'Booking completed successfully', bookingId: result.insertedId }, { status: 201 });
   } catch (error) {
     console.error('Error creating booking:', error);
@@ -204,26 +201,40 @@ export async function DELETE(request: Request) {
     const client = await clientPromise;
     const db = client.db();
     const bookingsCollection = db.collection('bookings');
-
-    // To ensure a user can only delete their own booking, we match both id and riderId
-    const result = await bookingsCollection.deleteOne({
-      _id: new ObjectId(bookingId),
-      riderId: riderId,
+    
+    // Find the booking to be cancelled
+    const bookingToCancel = await bookingsCollection.findOne({
+        _id: new ObjectId(bookingId),
+        riderId: riderId
     });
 
-    if (result.deletedCount === 0) {
+    if (!bookingToCancel) {
       return NextResponse.json({ message: 'Booking not found or you do not have permission to delete it' }, { status: 404 });
     }
     
-    // Also delete associated financial record
+    // Instead of deleting, move it to a 'cancelled_bookings' collection for records and refunds
+    const cancelledBooking = {
+        ...bookingToCancel,
+        cancelledAt: new Date(),
+        status: 'cancelled',
+        refundStatus: 'pending' // For the refund process
+    };
+    await db.collection('cancelled_bookings').insertOne(cancelledBooking);
+
+    // Now delete from the active bookings
+    const result = await bookingsCollection.deleteOne({ _id: new ObjectId(bookingId) });
+
+    if (result.deletedCount === 0) {
+        // This case should be rare, but as a safeguard.
+        return NextResponse.json({ message: 'Booking could not be cancelled.'}, { status: 400 });
+    }
+    
+    // If a financial record existed (it shouldn't for non-completed trips), delete it
     await db.collection('trip_financials').deleteOne({ bookingId: new ObjectId(bookingId) });
 
-
-    return NextResponse.json({ message: 'Booking cancelled successfully' }, { status: 200 });
+    return NextResponse.json({ message: 'Booking cancelled successfully. A full refund will be processed.' }, { status: 200 });
   } catch (error) {
     console.error('Error deleting booking:', error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
   }
 }
-
-    

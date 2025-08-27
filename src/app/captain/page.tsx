@@ -3,10 +3,9 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import dynamic from 'next/dynamic';
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut, BrainCircuit, Clock, Sun, ShieldAlert, Route as RouteIcon } from "lucide-react";
+import { ArrowLeft, AlertCircle, Ship, User, Navigation, Wind, Eye, CheckSquare, Sailboat, MapPin, Cloudy, Users, LogOut, BrainCircuit, Clock, Sun, ShieldAlert, Route as RouteIcon, Ban, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,14 +15,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/lib/firebase/config";
 import { signOut } from "firebase/auth";
-
-const InteractiveMap = dynamic(() => import('@/components/interactive-map'), {
-  ssr: false,
-  loading: () => <Skeleton className="h-full w-full" />,
-});
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Passenger {
-    bookingId: string;
     name: string;
     uid: string;
     bookingType: 'seat' | 'whole_boat';
@@ -36,6 +30,7 @@ interface Journey {
     pickup: { name: string; lat: number; lng: number; };
     destination: { name: string; lat: number; lng: number; };
     passengers: Passenger[];
+    bookingIds: string[];
     tripDate: string;
 }
 
@@ -50,8 +45,9 @@ export default function CaptainDashboardPage() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [selectedJourney, setSelectedJourney] = useState<Journey | null>(null);
   
-  const [aiBriefing, setAiBriefing] = useState<string | null>(null);
-  const [isStartingJourney, setIsStartingJourney] = useState(false);
+  const [aiBriefing, setAiBriefing] = useState<string>('');
+  const [isBriefingLoading, setIsBriefingLoading] = useState(false);
+  const [journeyState, setJourneyState] = useState<'idle' | 'briefing' | 'active'>('idle');
  
 
   const fetchJourneys = useCallback(async (captainId: string) => {
@@ -81,8 +77,6 @@ export default function CaptainDashboardPage() {
     }
     if (profile?.role === 'captain' || profile?.role === 'admin') {
       setIsCaptain(true);
-       // Admins can view, but fetching might require a specific captain ID.
-       // For this dashboard, we'll fetch trips only for actual captains.
       if (profile.role === 'captain') {
          fetchJourneys(user.uid);
       } else {
@@ -95,62 +89,70 @@ export default function CaptainDashboardPage() {
 
   const handleSelectJourney = (journey: Journey) => {
     setSelectedJourney(journey);
-    setAiBriefing(null); // Clear previous briefing when selecting a new journey
+    setAiBriefing('');
+    setJourneyState('idle');
   };
   
-  const handleStartJourney = async () => {
+  const handleGetBriefing = async () => {
     if (!selectedJourney) return;
 
-    setIsStartingJourney(true);
-    setAiBriefing(null);
-
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
-    const username = process.env.NEXT_PUBLIC_N8N_USERNAME;
-    const password = process.env.NEXT_PUBLIC_N8N_PASSWORD;
-
-    if (!webhookUrl || !username || !password) {
-        toast({ title: "Configuration Error", description: "The AI agent is not configured correctly.", variant: "destructive"});
-        setIsStartingJourney(false);
-        return;
-    }
+    setIsBriefingLoading(true);
+    setAiBriefing('');
 
     try {
-        const payload = [{
-              lat: selectedJourney.pickup.lat,
-              long: selectedJourney.pickup.lng,
-              destination: selectedJourney.destination.name
-        }];
-
-        const response = await fetch(webhookUrl, {
+        const response = await fetch('/api/captain/briefing', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${btoa(`${username}:${password}`)}`
-          },
-          body: JSON.stringify(payload)
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([{
+            lat: selectedJourney.pickup.lat,
+            long: selectedJourney.pickup.lng,
+            destination: selectedJourney.destination.name
+          }])
         });
         
         if (response.ok) {
             const briefingText = await response.text();
-            if (briefingText) {
-                setAiBriefing(briefingText);
-                toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
-            } else {
-                toast({ title: "Briefing Error", description: "Received an empty response from the AI agent.", variant: "destructive" });
-            }
+            setAiBriefing(briefingText);
+            setJourneyState('active'); // Move to active state to show Complete/Cancel buttons
+            toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
-            const errorText = await response.text();
-            console.error("Briefing API error:", errorText);
-            toast({ title: "Briefing Error", description: errorText || "Could not retrieve AI briefing.", variant: "destructive" });
+            const errorData = await response.json();
+            console.error("Briefing API error:", errorData.message);
+            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing.", variant: "destructive" });
         }
     } catch (error: any) {
         console.error("Error getting AI briefing:", error);
         toast({ title: "Briefing Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
     } finally {
-        setIsStartingJourney(false);
+        setIsBriefingLoading(false);
     }
   };
   
+  const handleUpdateJourneyStatus = async (status: 'completed' | 'cancelled') => {
+    if (!selectedJourney) return;
+
+    try {
+        const response = await fetch('/api/captain/journey', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingIds: selectedJourney.bookingIds, status })
+        });
+        if (response.ok) {
+            toast({ title: "Success", description: `Journey marked as ${status}.`});
+            // Refresh journeys list
+            if(user) fetchJourneys(user.uid);
+            setSelectedJourney(null);
+            setJourneyState('idle');
+        } else {
+            const errorData = await response.json();
+            toast({ title: "Error", description: errorData.message || `Could not mark journey as ${status}.`, variant: "destructive" });
+        }
+    } catch (error) {
+        console.error(`Error updating journey to ${status}:`, error);
+        toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive"});
+    }
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/');
@@ -253,15 +255,15 @@ export default function CaptainDashboardPage() {
         <main className="container mx-auto p-4 sm:p-6 md:p-8">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold">Captain's Dashboard</h1>
-                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned journeys. Select one to view the details.</p>
+                <p className="text-muted-foreground">Welcome, {user?.displayName}. Here are your assigned journeys for today.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 space-y-4">
                      <Card>
                         <CardHeader>
-                            <CardTitle>Journey Manifest</CardTitle>
-                            <CardDescription>Select a journey to view the passenger list.</CardDescription>
+                            <CardTitle>Upcoming Journeys</CardTitle>
+                            <CardDescription>Select a journey to view its manifest.</CardDescription>
                         </CardHeader>
                         <CardContent className="max-h-[60vh] overflow-y-auto">
                             {journeys.length > 0 ? (
@@ -271,14 +273,19 @@ export default function CaptainDashboardPage() {
                                         <p className="font-semibold">{journey.boat.name}</p>
                                         <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> From: <span className="font-medium">{journey.pickup.name || 'Unknown'}</span></p>
                                         <p className="text-sm"> <MapPin className="inline h-3 w-3 -mt-1"/> To: <span className="font-medium">{journey.destination.name || 'Unknown'}</span></p>
-                                        <div className="mt-2">
-                                            <p className="text-xs text-muted-foreground">Total Passengers: {journey.passengers.length}</p>
+                                        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                                           <Users className="h-4 w-4" />
+                                           <span>{journey.passengers.length} passenger(s)</span>
                                         </div>
                                     </button>
                                 ))}
                                 </div>
                             ) : (
-                                <p className="text-center text-muted-foreground py-8">No journeys assigned.</p>
+                                <div className="text-center text-muted-foreground py-8">
+                                    <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+                                    <p className="mt-4">No pending journeys assigned.</p>
+                                    <p className="text-xs">All caught up!</p>
+                                </div>
                             )}
                         </CardContent>
                      </Card>
@@ -289,32 +296,34 @@ export default function CaptainDashboardPage() {
                         <>
                          <Card>
                             <CardHeader>
-                                <CardTitle>Trip Details: {selectedJourney.pickup.name} to {selectedJourney.destination.name}</CardTitle>
-                                <CardDescription>Passenger manifest for boat: {selectedJourney.boat.name} ({selectedJourney.boat.licenseNumber})</CardDescription>
+                                <CardTitle>Trip Manifest: {selectedJourney.pickup.name} to {selectedJourney.destination.name}</CardTitle>
+                                <CardDescription>Boat: {selectedJourney.boat.name} ({selectedJourney.boat.licenseNumber}) | Total Passengers: {selectedJourney.passengers.length}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <ul className="divide-y">
-                                    {selectedJourney.passengers.map(p => (
-                                        <li key={p.bookingId} className="flex justify-between items-center py-2">
+                                <ul className="divide-y max-h-48 overflow-y-auto">
+                                    {selectedJourney.passengers.map((p, index) => (
+                                        <li key={index} className="flex justify-between items-center py-2">
                                             <span className="font-medium">{p.name}</span>
                                             <span className="text-sm text-muted-foreground">{p.bookingType === 'seat' ? `${p.seats} seat(s)` : 'Whole boat'}</span>
                                         </li>
                                     ))}
                                 </ul>
-                                <div className="pt-4 flex justify-end gap-2">
-                                     <Button variant="outline" onClick={handleStartJourney} disabled={isStartingJourney}>
-                                        {isStartingJourney ? "Getting Briefing..." : <><CheckSquare className="mr-2"/>Start Journey</>}
-                                     </Button>
-                                </div>
+                                {journeyState === 'idle' && (
+                                     <div className="pt-4 flex justify-end gap-2">
+                                         <Button variant="outline" onClick={handleGetBriefing} disabled={isBriefingLoading}>
+                                            {isBriefingLoading ? "Getting Briefing..." : <><BrainCircuit className="mr-2"/>Get AI Briefing</>}
+                                         </Button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                         
-                        {isStartingJourney && (
+                        {isBriefingLoading && (
                             <Card>
                                 <CardContent className="p-6">
                                     <div className="flex items-center justify-center space-x-2">
-                                        <Skeleton className="h-5 w-5 rounded-full" />
-                                        <p className="text-muted-foreground">Contacting AI agent for briefing...</p>
+                                        <Skeleton className="h-5 w-5 rounded-full animate-spin" />
+                                        <p className="text-muted-foreground">The AI agent is preparing your briefing...</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -327,17 +336,34 @@ export default function CaptainDashboardPage() {
                                     <CardDescription>Key information for your trip to {selectedJourney.destination.name}.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div>
-                                        <h4 className="font-semibold flex items-center gap-2"><RouteIcon /> Route & Weather Summary</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{aiBriefing}</p>
-                                    </div>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiBriefing}</p>
+                                     {journeyState === 'active' && (
+                                        <div className="pt-4 flex justify-end gap-2">
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive"><Ban className="mr-2" />Cancel Journey</Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>This will cancel the journey for all passengers and issue full refunds. This action cannot be undone.</AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Go Back</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleUpdateJourneyStatus('cancelled')}>Yes, Cancel Journey</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                            <Button onClick={() => handleUpdateJourneyStatus('completed')}><CheckCircle className="mr-2" />Complete Journey</Button>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )}
                         </>
 
                     ) : (
-                         <Card className="flex items-center justify-center min-h-96">
+                         <Card className="flex items-center justify-center min-h-[50vh]">
                             <div className="text-center">
                                 <Sailboat className="mx-auto h-12 w-12 text-muted-foreground" />
                                 <p className="mt-4 text-muted-foreground">Please select a journey to view its details.</p>
@@ -350,5 +376,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-
-    

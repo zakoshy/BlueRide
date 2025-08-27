@@ -25,12 +25,12 @@ export async function GET(request: Request) {
         return NextResponse.json([], { status: 200 }); // No boats, so no trips
     }
 
-    // Find bookings for those boats that are 'completed' (i.e., paid and ready for departure)
+    // Find bookings for those boats that are 'confirmed' and ready for departure
     const bookings = await db.collection('bookings').aggregate([
         {
             $match: { 
                 boatId: { $in: assignedBoatIds },
-                status: 'completed'
+                status: 'confirmed'
             }
         },
         {
@@ -54,9 +54,9 @@ export async function GET(request: Request) {
                     pickup: "$pickup",
                     destination: "$destination"
                 },
+                bookingIds: { $push: "$_id" },
                 passengers: { 
                     $push: {
-                        bookingId: "$_id",
                         name: { $ifNull: [ "$riderInfo.name", "Unknown Rider" ] },
                         uid: { $ifNull: [ "$riderInfo.uid", "Unknown" ] },
                         bookingType: "$bookingType",
@@ -75,8 +75,8 @@ export async function GET(request: Request) {
                 as: 'boat'
             }
         },
-        {
-             $lookup: {
+         {
+            $lookup: {
                 from: 'locations',
                 localField: '_id.pickup',
                 foreignField: 'name',
@@ -120,6 +120,7 @@ export async function GET(request: Request) {
                     lng: { $ifNull: [ "$destinationLocation.lng", 0 ] }
                 },
                 passengers: 1,
+                bookingIds: 1, // Pass the booking IDs to the frontend
                 tripDate: "$earliestBookingTime"
             }
         },
@@ -137,5 +138,6 @@ export async function GET(request: Request) {
     
 
     
+
 
 
