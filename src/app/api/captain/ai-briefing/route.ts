@@ -16,7 +16,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Missing required payload: lat, long, destination' }, { status: 400 });
         }
 
-        const payload = { lat, long, destination };
+        // The webhook expects an array containing a single object.
+        const payload = [{ lat, long, destination }];
 
         // Encode credentials for Basic Authentication using Buffer for server-side compatibility
         const credentials = Buffer.from(`${username}:${password}`).toString('base64');
