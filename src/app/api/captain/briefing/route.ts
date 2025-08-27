@@ -47,5 +47,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'An internal error occurred while contacting the AI agent.' }, { status: 500 });
     }
 }
-
-    
