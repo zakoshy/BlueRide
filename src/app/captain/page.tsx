@@ -103,11 +103,11 @@ export default function CaptainDashboardPage() {
         const response = await fetch('/api/captain/briefing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify([{
-            latitude: selectedJourney.pickup.lat,
-            longitude: selectedJourney.pickup.lng,
+          body: JSON.stringify({
+            lat: selectedJourney.pickup.lat,
+            long: selectedJourney.pickup.lng,
             destination: selectedJourney.destination.name
-          }])
+          })
         });
         
         if (response.ok) {
@@ -116,9 +116,9 @@ export default function CaptainDashboardPage() {
             setJourneyState('active'); 
             toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
-            const errorData = await response.text();
-            console.error("Briefing API error:", errorData);
-            toast({ title: "Briefing Error", description: "Could not retrieve AI briefing.", variant: "destructive" });
+            const errorText = await response.text();
+            console.error("Briefing API error:", errorText);
+            toast({ title: "Briefing Error", description: errorText || "Could not retrieve AI briefing.", variant: "destructive" });
         }
     } catch (error: any) {
         console.error("Error getting AI briefing:", error);
@@ -376,4 +376,3 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
-
