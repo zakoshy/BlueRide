@@ -28,26 +28,14 @@ export async function POST(request: Request) {
         });
 
         if (!n8nResponse.ok) {
-            // If n8n gives an error, forward it
             const errorText = await n8nResponse.text();
             console.error(`n8n webhook error (${n8nResponse.status}):`, errorText);
             return new Response( `The AI agent returned an error: ${errorText}`, { status: n8nResponse.status });
         }
         
-        // n8n returns the output as plain text in a JSON wrapper
-        // We will parse the JSON, extract the text, and send that back
-        const responseData = await n8nResponse.json();
+        const responseText = await n8nResponse.text();
         
-        // The expected format is an array with one object: [{ "output": "..." }]
-        const outputText = responseData?.[0]?.output;
-
-        if (typeof outputText !== 'string') {
-             console.error('AI agent response did not contain a valid "output" string.', responseData);
-             return new Response('Failed to parse the AI briefing.', { status: 500 });
-        }
-        
-        // Return the plain text response directly to the client
-        return new Response(outputText, {
+        return new Response(responseText, {
             status: 200,
             headers: {
                 'Content-Type': 'text/plain',
