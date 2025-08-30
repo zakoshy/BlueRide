@@ -112,15 +112,16 @@ export default function CaptainDashboardPage() {
           body: JSON.stringify(payload)
         });
         
+        const responseText = await response.text();
+        
         if (response.ok) {
-            const briefingText = await response.text();
-            setAiBriefing(briefingText);
+            // The response is plain text, so we can set it directly
+            setAiBriefing(responseText);
             setJourneyState('active'); 
             toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
-            const errorText = await response.text();
-            console.error("Briefing API error:", errorText);
-            toast({ title: "Briefing Error", description: errorText || "Could not retrieve AI briefing.", variant: "destructive" });
+            console.error("Briefing API error:", responseText);
+            toast({ title: "Briefing Error", description: responseText || "Could not retrieve AI briefing.", variant: "destructive" });
         }
     } catch (error: any) {
         console.error("Error getting AI briefing:", error);
