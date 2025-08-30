@@ -104,8 +104,8 @@ export default function CaptainDashboardPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify([{
-            lat: selectedJourney.pickup.lat,
-            long: selectedJourney.pickup.lng,
+            latitude: selectedJourney.pickup.lat,
+            longitude: selectedJourney.pickup.lng,
             destination: selectedJourney.destination.name
           }])
         });
@@ -377,4 +377,3 @@ export default function CaptainDashboardPage() {
   );
 }
 
-    
