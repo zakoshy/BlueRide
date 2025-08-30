@@ -113,12 +113,12 @@ export default function CaptainDashboardPage() {
         if (response.ok) {
             const briefingText = await response.text();
             setAiBriefing(briefingText);
-            setJourneyState('active'); // Move to active state to show Complete/Cancel buttons
+            setJourneyState('active'); 
             toast({ title: "AI Briefing Received", description: "Pre-trip analysis is available below." });
         } else {
-            const errorData = await response.json();
-            console.error("Briefing API error:", errorData.message);
-            toast({ title: "Briefing Error", description: errorData.message || "Could not retrieve AI briefing.", variant: "destructive" });
+            const errorData = await response.text();
+            console.error("Briefing API error:", errorData);
+            toast({ title: "Briefing Error", description: "Could not retrieve AI briefing.", variant: "destructive" });
         }
     } catch (error: any) {
         console.error("Error getting AI briefing:", error);
@@ -376,3 +376,5 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
+
+    
