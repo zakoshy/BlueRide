@@ -100,14 +100,16 @@ export default function CaptainDashboardPage() {
     setAiBriefing('');
 
     try {
+        const payload = {
+            lat: selectedJourney.pickup.lat.toString(),
+            long: selectedJourney.pickup.lng.toString(),
+            destination: selectedJourney.destination.name
+        };
+
         const response = await fetch('/api/captain/briefing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            lat: selectedJourney.pickup.lat,
-            long: selectedJourney.pickup.lng,
-            destination: selectedJourney.destination.name
-          })
+          body: JSON.stringify(payload)
         });
         
         if (response.ok) {

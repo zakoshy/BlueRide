@@ -33,7 +33,22 @@ export async function POST(request: Request) {
             return new Response( `The AI agent returned an error: ${errorText}`, { status: n8nResponse.status });
         }
         
+        // n8n can sometimes return a JSON array with the output, or just the text
+        // To handle both, we'll try to parse it, and fall back to plain text
         const responseText = await n8nResponse.text();
+        try {
+            const jsonData = JSON.parse(responseText);
+            // If it's the expected array format, extract the output
+            if (Array.isArray(jsonData) && jsonData[0] && jsonData[0].output) {
+                return new Response(jsonData[0].output, {
+                    status: 200,
+                    headers: { 'Content-Type': 'text/plain' },
+                });
+            }
+        } catch (e) {
+            // It's not JSON, so it's likely the plain text output directly
+            // Do nothing and fall through to return the raw text
+        }
         
         return new Response(responseText, {
             status: 200,
